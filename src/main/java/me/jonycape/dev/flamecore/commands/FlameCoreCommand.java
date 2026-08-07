@@ -1,0 +1,153 @@
+package me.jonycape.dev.flamecore.commands;
+
+import me.jonycape.dev.flamecore.Main;
+import me.jonycape.dev.flamecore.config.ConfigKeys;
+import me.jonycape.dev.flamecore.management.ServerManagementService;
+import me.jonycape.dev.flamecore.management.SessionManager;
+import me.jonycape.dev.flamecore.utils.MessageUtils;
+import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class FlameCoreCommand extends BaseCommand implements TabCompleter {
+
+    private static final List<String> SUBCOMMANDS = List.of(
+            "tps", "mspt", "system", "online", "worlds", "announce", "player", "check", "reload");
+
+    private final ServerManagementService management;
+
+    public FlameCoreCommand(Main plugin) {
+        super(plugin);
+        this.management = new ServerManagementService(plugin);
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length == 0) {
+            sendMessage(sender, ConfigKeys.MESSAGE_MANAGEMENT_INFO);
+            return true;
+        }
+
+        String sub = args[0].toLowerCase();
+        if (!(sender instanceof Player player)) {
+            return handleConsole(sender, sub);
+        }
+
+        if (!isOwner(player)) {
+            sendMessage(sender, ConfigKeys.MESSAGE_NO_PERMISSION);
+            return true;
+        }
+        if (!SessionManager.hasAccess(player.getName())) {
+            sendMessage(sender, ConfigKeys.MESSAGE_PANEL_LOCKED);
+            return true;
+        }
+
+        return handleSubcommand(sender, sub, args);
+    }
+
+    private boolean handleSubcommand(CommandSender sender, String sub, String[] args) {
+        switch (sub) {
+            case "tps":
+                sender.sendMessage(MessageUtils.color(management.tps()));
+                return true;
+            case "mspt":
+                sender.sendMessage(MessageUtils.color(management.mspt()));
+                return true;
+            case "system":
+                sender.sendMessage(MessageUtils.color(management.system()));
+                return true;
+            case "online":
+                sender.sendMessage(MessageUtils.color(management.online()));
+                return true;
+            case "worlds":
+                sender.sendMessage(MessageUtils.color(management.worlds()));
+                return true;
+            case "announce":
+                if (args.length < 2) {
+                    sendMessage(sender, ConfigKeys.MESSAGE_MANAGEMENT_USAGE);
+                    return true;
+                }
+                management.announce(String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length)));
+                return true;
+            case "player":
+                if (args.length < 2) {
+                    sendMessage(sender, ConfigKeys.MESSAGE_MANAGEMENT_USAGE);
+                    return true;
+                }
+                Player target = Bukkit.getPlayerExact(args[1]);
+                if (target == null) {
+                    sendMessage(sender, ConfigKeys.MESSAGE_MANAGEMENT_PLAYER_NOT_FOUND, "player", args[1]);
+                    return true;
+                }
+                sender.sendMessage(MessageUtils.color(management.player(target)));
+                return true;
+            case "check":
+                sender.sendMessage(MessageUtils.color(management.check()));
+                return true;
+            case "reload":
+                plugin.reloadPlugin();
+                sendMessage(sender, ConfigKeys.MESSAGE_MANAGEMENT_RELOAD);
+                return true;
+            default:
+                sendMessage(sender, ConfigKeys.MESSAGE_UNKNOWN_COMMAND);
+                return true;
+        }
+    }
+
+    private boolean handleConsole(CommandSender sender, String sub) {
+        switch (sub) {
+            case "reload":
+                plugin.reloadPlugin();
+                sender.sendMessage("FlameCore перезагружен.");
+                return true;
+            case "tps":
+            case "mspt":
+            case "system":
+            case "online":
+            case "check":
+                String text = switch (sub) {
+                    case "tps" -> management.tps();
+                    case "mspt" -> management.mspt();
+                    case "system" -> management.system();
+                    case "online" -> management.online();
+                    default -> management.check();
+                };
+                sender.sendMessage(MessageUtils.color(text));
+                return true;
+            default:
+                sender.sendMessage("FlameCore: используй /flamecore tps | mspt | system | online | check | reload");
+                return true;
+        }
+    }
+
+    private boolean isOwner(Player player) {
+        String owner = Main.getCfg().getString(ConfigKeys.OWNER_NAME, "");
+        return player.getName().equalsIgnoreCase(owner);
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        List<String> completions = new ArrayList<>();
+        if (args.length == 1) {
+            String prefix = args[0].toLowerCase();
+            for (String sub : SUBCOMMANDS) {
+                if (sub.startsWith(prefix)) {
+                    completions.add(sub);
+                }
+            }
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("player")) {
+            String prefix = args[1].toLowerCase();
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                if (online.getName().toLowerCase().startsWith(prefix)) {
+                    completions.add(online.getName());
+                }
+            }
+        }
+        return completions;
+    }
+}

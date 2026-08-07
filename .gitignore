@@ -1,0 +1,29 @@
+# Maven
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Compiled output / OS
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.log
+.DS_Store
+Thumbs.db
+
+# Local database & runtime data (H2, logs, config overrides)
+*.mv.db
+*.trace.db
+*.h2.db
+logs/
+plugins/
+
+# Secrets / local overrides
+*.secret
+.env

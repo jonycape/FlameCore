@@ -1,0 +1,23 @@
+name: FlameCore
+description: Главный управляющий модуль сервера FlameDex
+version: '${project.version}'
+main: me.jonycape.dev.flamecore.Main
+api-version: '1.20'
+load: POSTWORLD
+
+authors: [ jonycape ]
+website: www.flamedon.ru
+softdepend: [ PlaceholderAPI ]
+
+commands:
+  giveaway:
+    description: Управление конкурсами
+    usage: /giveaway create <prize> <time> | /giveaway join <id>
+  flamecore:
+    description: Главная команда плагина FlameCore
+    aliases: [fc]
+
+permissions:
+  flamecore.admin:
+    description: Доступ к админским функциям FlameCore
+    default: op
