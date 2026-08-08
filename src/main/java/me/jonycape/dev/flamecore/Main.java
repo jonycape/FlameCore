@@ -10,6 +10,8 @@ import me.jonycape.dev.flamecore.giveaway.GiveawayScheduler;
 import me.jonycape.dev.flamecore.protection.AdminProtectionListener;
 import me.jonycape.dev.flamecore.protection.AdminProtectionService;
 import me.jonycape.dev.flamecore.protection.AdminRestrictionListener;
+import me.jonycape.dev.flamecore.protection.DangerousCommandListener;
+import me.jonycape.dev.flamecore.protection.DangerousCommandService;
 import me.jonycape.dev.flamecore.protection.TelegramNotifier;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -46,6 +48,9 @@ public final class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (telegramNotifier != null) {
+            telegramNotifier.stopPolling();
+        }
         if (databaseManager != null) {
             databaseManager.close();
         }
@@ -78,7 +83,19 @@ public final class Main extends JavaPlugin {
         AdminProtectionListener listener = new AdminProtectionListener(this, adminProtectionService);
         getServer().getPluginManager().registerEvents(listener, this);
         getServer().getPluginManager().registerEvents(new AdminRestrictionListener(adminProtectionService), this);
-        telegramNotifier.startPolling(listener.createCallbackHandler());
+
+        DangerousCommandService dangerousService = new DangerousCommandService(this, adminProtectionService);
+        getServer().getPluginManager().registerEvents(
+                new DangerousCommandListener(adminProtectionService, dangerousService), this);
+
+        // Маршрутизация callback из Telegram: dc:* — опасные команды, остальное — вход/панель.
+        telegramNotifier.startPolling((data, from) -> {
+            if (data != null && data.startsWith("dc:")) {
+                dangerousService.handleCallback(data, from);
+            } else {
+                listener.handleCallback(data, from);
+            }
+        });
     }
 
     public void reloadPlugin() {

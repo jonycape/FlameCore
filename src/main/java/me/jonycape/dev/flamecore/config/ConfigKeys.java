@@ -16,6 +16,15 @@ public final class ConfigKeys {
 
     public static final String ADMINS = "admins";
 
+    public static final String DANGEROUS_COMMANDS = "protection.dangerous-commands";
+    public static final String DANGEROUS_CONFIRM_TIMEOUT = "protection.confirm-timeout";
+
+    public static final String TG_ADMIN_LOGIN = "telegram-messages.admin-login";
+    public static final String TG_OWNER_LOGIN = "telegram-messages.owner-login";
+    public static final String TG_DANGER_SENDER = "telegram-messages.danger-sender";
+    public static final String TG_DANGER_OWNER = "telegram-messages.danger-owner";
+    public static final String TG_DANGER_EXECUTED = "telegram-messages.danger-executed";
+
     public static final String MESSAGE_PREFIX = "messages.prefix";
     public static final String MESSAGE_NO_PERMISSION = "messages.no-permission";
     public static final String MESSAGE_UNKNOWN_COMMAND = "messages.unknown-command";
@@ -35,6 +44,8 @@ public final class ConfigKeys {
     public static final String MESSAGE_ADMIN_APPROVED = "messages.admin-approved";
     public static final String MESSAGE_ADMIN_DENIED = "messages.admin-denied";
     public static final String MESSAGE_ADMIN_WAITING = "messages.admin-waiting";
+    public static final String MESSAGE_ADMIN_WAITING_TITLE = "messages.admin-waiting-title";
+    public static final String MESSAGE_ADMIN_WAITING_SUBTITLE = "messages.admin-waiting-subtitle";
     public static final String MESSAGE_OWNER_PANEL_GRANTED = "messages.owner-panel-granted";
     public static final String MESSAGE_OWNER_PANEL_DENIED = "messages.owner-panel-denied";
 

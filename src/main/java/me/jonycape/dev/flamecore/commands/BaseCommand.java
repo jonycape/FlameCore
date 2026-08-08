@@ -2,7 +2,6 @@ package me.jonycape.dev.flamecore.commands;
 
 import lombok.RequiredArgsConstructor;
 import me.jonycape.dev.flamecore.Main;
-import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.utils.MessageUtils;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -18,10 +17,6 @@ public abstract class BaseCommand implements CommandExecutor {
 
     protected void sendMessage(CommandSender sender, String key, String... pairs) {
         String body = MessageUtils.replace(Main.getCfg().getMultiLine(key), pairs);
-        sender.sendMessage(MessageUtils.color(prefix() + body));
-    }
-
-    protected String prefix() {
-        return Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_PREFIX);
+        sender.sendMessage(MessageUtils.color(body));
     }
 }

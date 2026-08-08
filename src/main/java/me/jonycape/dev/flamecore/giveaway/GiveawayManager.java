@@ -88,9 +88,7 @@ public final class GiveawayManager {
     }
 
     private String buildMessage(String key, String... pairs) {
-        String body = MessageUtils.replace(Main.getCfg().getMultiLine(key), pairs);
-        String prefix = Main.getCfg().getString(ConfigKeys.MESSAGE_PREFIX, "");
-        return prefix + body;
+        return MessageUtils.replace(Main.getCfg().getMultiLine(key), pairs);
     }
 
     public enum JoinResult {

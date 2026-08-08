@@ -61,6 +61,15 @@ public final class ConfigManager {
         return value == null ? def : value;
     }
 
+    public int getInt(String path, int def) {
+        Object value = cache.get(path);
+        try {
+            return value == null ? def : Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public List<String> getStringList(String path) {
         Object value = cache.get(path);
@@ -73,5 +82,21 @@ public final class ConfigManager {
             return String.join("\n", ((List<String>) value));
         }
         return value == null ? "" : String.valueOf(value);
+    }
+
+    /** Читает секцию как карту "ключ (в нижнем регистре) → строка". */
+    public Map<String, String> getStringMap(String path) {
+        Object value = cache.get(path);
+        if (value instanceof org.bukkit.configuration.ConfigurationSection section) {
+            Map<String, String> map = new HashMap<>();
+            for (String key : section.getKeys(false)) {
+                String item = section.getString(key);
+                if (item != null) {
+                    map.put(key.toLowerCase(), item);
+                }
+            }
+            return map;
+        }
+        return java.util.Collections.emptyMap();
     }
 }

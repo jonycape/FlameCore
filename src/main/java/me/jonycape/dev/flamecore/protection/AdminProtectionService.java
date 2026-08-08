@@ -10,7 +10,9 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.FileHandler;
 import java.util.logging.Formatter;
@@ -21,17 +23,15 @@ import java.util.logging.Logger;
 public final class AdminProtectionService {
 
     private final Main plugin;
-    private final Set<String> admins;
+    /** Секция "admins" — карта "ник → Telegram ID" (ники в нижнем регистре). */
+    private final Map<String, String> admins;
     private final Set<String> pendingLogins;
     private final String ownerName;
     private final Logger logger;
 
     public AdminProtectionService(Main plugin) {
         this.plugin = plugin;
-        this.admins = new HashSet<>();
-        for (String name : Main.getCfg().getStringList(ConfigKeys.ADMINS)) {
-            admins.add(name.toLowerCase());
-        }
+        this.admins = new HashMap<>(Main.getCfg().getStringMap(ConfigKeys.ADMINS));
         this.pendingLogins = new HashSet<>();
         this.ownerName = Main.getCfg().getString(ConfigKeys.OWNER_NAME, "").toLowerCase();
         this.logger = createLogger();
@@ -55,11 +55,16 @@ public final class AdminProtectionService {
     }
 
     public boolean isAdmin(String name) {
-        return admins.contains(name.toLowerCase());
+        return admins.containsKey(name.toLowerCase());
     }
 
     public boolean isOwner(String name) {
         return name != null && name.equalsIgnoreCase(ownerName);
+    }
+
+    /** Telegram ID администратора по нику, или null если его нет в конфиге. */
+    public String getTelegramId(String name) {
+        return admins.get(name.toLowerCase());
     }
 
     public void onPlayerJoin(Player player) {
@@ -77,8 +82,12 @@ public final class AdminProtectionService {
             plugin.getTelegramNotifier().sendOwnerLogin(
                     player.getName(), ip, System.currentTimeMillis(), true);
         } else {
-            plugin.getTelegramNotifier().sendAdminLogin(
-                    player.getName(), ip, System.currentTimeMillis());
+            // Отправляем уведомление самому админу в его личку (по его Telegram ID).
+            String adminTelegramId = admins.get(player.getName().toLowerCase());
+            if (adminTelegramId != null && !adminTelegramId.isEmpty()) {
+                plugin.getTelegramNotifier().sendAdminLogin(
+                        adminTelegramId, player.getName(), ip, System.currentTimeMillis());
+            }
         }
         notifyWaiting(player);
     }
@@ -98,8 +107,7 @@ public final class AdminProtectionService {
         pendingLogins.remove(player.getName().toLowerCase());
         unfreezePlayer(player);
         player.sendMessage(MessageUtils.color(
-                prefix()
-                        + MessageUtils.replace(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_APPROVED),
+                MessageUtils.replace(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_APPROVED),
                         "player", player.getName())));
         log("Вход администратора ПОДТВЕРЖДЁН: " + player.getName() + ", время: " + now());
     }
@@ -124,9 +132,10 @@ public final class AdminProtectionService {
             return;
         }
         SessionManager.grant(player.getName());
+        pendingLogins.remove(player.getName().toLowerCase());
+        unfreezePlayer(player);
         player.sendMessage(MessageUtils.color(
-                prefix()
-                        + MessageUtils.replace(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_OWNER_PANEL_GRANTED),
+                MessageUtils.replace(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_OWNER_PANEL_GRANTED),
                         "player", player.getName())));
         log("Владельцу выдана панель управления: " + player.getName() + ", время: " + now());
     }
@@ -155,12 +164,17 @@ public final class AdminProtectionService {
 
     private void notifyWaiting(Player player) {
         player.sendMessage(MessageUtils.color(
-                prefix() + Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING)));
+                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING)));
+        player.showTitle(net.kyori.adventure.title.Title.title(
+                net.kyori.adventure.text.Component.text(
+                        MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_TITLE))),
+                net.kyori.adventure.text.Component.text(
+                        MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_SUBTITLE))),
+                net.kyori.adventure.title.Title.Times.times(
+                        net.kyori.adventure.util.Ticks.duration(10),
+                        net.kyori.adventure.util.Ticks.duration(100),
+                        net.kyori.adventure.util.Ticks.duration(10))));
         player.setInvulnerable(true);
-    }
-
-    private String prefix() {
-        return Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_PREFIX);
     }
 
     private void log(String message) {

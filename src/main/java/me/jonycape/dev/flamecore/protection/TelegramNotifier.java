@@ -1,239 +1,228 @@
 package me.jonycape.dev.flamecore.protection;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.pengrad.telegrambot.TelegramBot;
+import com.pengrad.telegrambot.UpdatesListener;
+import com.pengrad.telegrambot.model.CallbackQuery;
+import com.pengrad.telegrambot.model.Update;
+import com.pengrad.telegrambot.model.request.InlineKeyboardButton;
+import com.pengrad.telegrambot.model.request.InlineKeyboardMarkup;
+import com.pengrad.telegrambot.model.request.ParseMode;
+import com.pengrad.telegrambot.request.AnswerCallbackQuery;
+import com.pengrad.telegrambot.request.EditMessageReplyMarkup;
+import com.pengrad.telegrambot.request.SendMessage;
 import lombok.Getter;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
-import me.jonycape.dev.flamecore.management.SessionManager;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Scanner;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 
+/**
+ * Отправка и приём сообщений Telegram через библиотеку com.pengrad:java-telegram-bot-api
+ * (лёгкий транспорт на OkHttp — без тяжёлых зависимостей в отличие от org.telegram).
+ */
 public final class TelegramNotifier {
 
-    private static final String API_URL = "https://api.telegram.org/bot";
     private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
 
     private final Main plugin;
-    private final String token;
-    private final String ownerChatId;
+    private final TelegramBot bot;
 
     @Getter
-    private boolean available;
+    private volatile boolean available;
+
+    private volatile BiConsumer<String, String> callbackHandler;
 
     public TelegramNotifier(Main plugin) {
         this.plugin = plugin;
-        this.token = Main.getCfg().getString(ConfigKeys.BOT_TOKEN, "");
-        this.ownerChatId = Main.getCfg().getString(ConfigKeys.OWNER_TELEGRAM_ID, "");
-        this.available = !token.isEmpty() && !ownerChatId.isEmpty();
-    }
-
-    public void sendAdminLogin(String playerName, String ip, long timestamp) {
-        sendMessage("Запрос входа администратора\n\nНик: " + playerName + "\nIP: " + ip
-                        + "\nВремя: " + TIME_FORMAT.format(new Date(timestamp)),
-                buttons(button("Впустить", "allow " + playerName),
-                        button("Кикнуть", "kick " + playerName)));
-    }
-
-    public void sendOwnerLogin(String playerName, String ip, long timestamp, boolean panelAsked) {
-        JsonArray keyboard = new JsonArray();
-        JsonArray row = new JsonArray();
-        row.add(button("Впустить", "allow " + playerName));
-        row.add(button("Кикнуть", "kick " + playerName));
-        keyboard.add(row);
-        if (panelAsked) {
-            JsonArray panelRow = new JsonArray();
-            panelRow.add(button("Выдать доступ к панели", "panel " + playerName));
-            keyboard.add(panelRow);
-        }
-        JsonObject reply = new JsonObject();
-        reply.add("inline_keyboard", keyboard);
-
-        sendMessage("Запрос входа ВЛАДЕЛЬЦА\n\nНик: " + playerName + "\nIP: " + ip
-                        + "\nВремя: " + TIME_FORMAT.format(new Date(timestamp)), reply);
-    }
-
-    public void grantPanel(String playerName) {
-        SessionManager.grant(playerName);
-    }
-
-    private JsonObject buttons(JsonObject... btns) {
-        JsonArray keyboard = new JsonArray();
-        JsonArray row = new JsonArray();
-        for (JsonObject btn : btns) {
-            row.add(btn);
-        }
-        keyboard.add(row);
-        JsonObject reply = new JsonObject();
-        reply.add("inline_keyboard", keyboard);
-        return reply;
-    }
-
-    private JsonObject button(String text, String callbackData) {
-        JsonObject btn = new JsonObject();
-        btn.addProperty("text", text);
-        btn.addProperty("callback_data", callbackData);
-        return btn;
-    }
-
-    public void sendMessage(String text, JsonObject markup) {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("chat_id", ownerChatId);
-        payload.addProperty("text", text);
-        if (markup != null) {
-            payload.add("reply_markup", markup);
-        }
-        post("sendMessage", payload.toString());
+        String token = Main.getCfg().getString(ConfigKeys.BOT_TOKEN, "");
+        this.available = !token.isEmpty();
+        this.bot = new TelegramBot(token);
     }
 
     public void startPolling(BiConsumer<String, String> handler) {
-        if (token.isEmpty() || ownerChatId.isEmpty()) {
+        if (!available) {
             return;
         }
-        new Thread(() -> {
-            int offset = 0;
-            int failures = 0;
-            while (!Thread.currentThread().isInterrupted()) {
-                try {
-                    offset = poll(offset, handler);
-                    failures = 0;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    failures++;
-                    long backoff = Math.min(15000L, 3000L * failures);
-                    plugin.getLogger().log(Level.WARNING,
-                            "Ошибка опроса Telegram (" + failures + " подряд), пауза " + backoff + " мс", e);
-                    sleepQuietly(backoff);
-                    continue;
+        this.callbackHandler = handler;
+        bot.setUpdatesListener(this::processUpdates, e ->
+                plugin.getLogger().log(Level.WARNING, "Ошибка при приёме обновлений Telegram", e));
+    }
+
+    public void stopPolling() {
+        try {
+            bot.removeGetUpdatesListener();
+        } catch (Exception ignored) {
+        }
+    }
+
+    public int processUpdates(List<Update> updates) {
+        if (updates != null) {
+            for (Update update : updates) {
+                if (update.callbackQuery() != null) {
+                    handleCallback(update.callbackQuery());
                 }
-                sleepQuietly(700);
             }
-        }, "flamecore-telegram-polling").start();
+        }
+        return UpdatesListener.CONFIRMED_UPDATES_ALL;
     }
 
-    private int poll(int offset, BiConsumer<String, String> handler) throws InterruptedException {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("offset", offset);
-        payload.addProperty("timeout", 20);
-        payload.add("allowed_updates", arrayOf("callback_query"));
-
-        JsonObject response = post("getUpdates", payload.toString());
-        if (!response.has("ok") || !response.get("ok").getAsBoolean()) {
-            String description = response.has("description")
-                    ? response.get("description").getAsString() : "неизвестная ошибка";
-            if (description.toLowerCase().contains("conflict")) {
-                throw new InterruptedException();
+    private void handleCallback(CallbackQuery query) {
+        String data = query.data() == null ? "" : query.data();
+        try {
+            answerCallback(query.id());
+            afterCallbackKeyboard(query, data);
+            if (callbackHandler != null) {
+                String from = query.from() != null && query.from().username() != null
+                        ? query.from().username() : "";
+                callbackHandler.accept(data, from);
             }
-            throw new IllegalStateException(description);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Ошибка обработки callback Telegram: " + data, e);
         }
-        JsonElement result = response.get("result");
-        if (result == null || result.isJsonNull() || !result.isJsonArray()) {
-            return offset;
-        }
-        int newOffset = offset;
-        for (JsonElement element : result.getAsJsonArray()) {
-            JsonObject update = element.getAsJsonObject();
-            newOffset = update.get("update_id").getAsInt() + 1;
-            if (update.has("callback_query")) {
-                handleCallback(update.getAsJsonObject("callback_query"), handler);
-            }
-        }
-        return newOffset;
     }
 
-    private void handleCallback(JsonObject callback, BiConsumer<String, String> handler) {
-        String data = callback.has("data") ? callback.get("data").getAsString() : "";
-        String userName = callback.has("from") && callback.getAsJsonObject("from").has("username")
-                ? callback.getAsJsonObject("from").get("username").getAsString() : "";
-        String callbackId = callback.has("id") ? callback.get("id").getAsString() : "";
-        answerCallback(callbackId);
-        removeInlineKeyboard(callback);
-        handler.accept(data, userName);
+    /** Поведение клавиатуры после нажатия кнопки (логика владельца). */
+    private void afterCallbackKeyboard(CallbackQuery query, String data) {
+        if (data.startsWith("dc:")) {
+            removeKeyboard(query);
+            return;
+        }
+        String[] parts = data.split("\\s+", 2);
+        if (parts.length < 2) {
+            return;
+        }
+        String action = parts[0];
+        String playerName = parts[1];
+        String ownerName = Main.getCfg().getString(ConfigKeys.OWNER_NAME, "");
+        boolean ownerPress = !ownerName.isEmpty() && ownerName.equalsIgnoreCase(playerName);
+        if ("allow".equals(action) && ownerPress) {
+            // Владелец нажал «Впустить»: убираем «Впустить» и «Кикнуть», но оставляем «Выдать панель».
+            editKeyboard(query, new InlineKeyboardMarkup(panelButton(playerName)));
+        } else {
+            removeKeyboard(query);
+        }
+    }
+
+    /** Сообщение для самого администратора (отправляется в личку админа). */
+    public void sendAdminLogin(String telegramId, String playerName, String ip, long timestamp) {
+        if (telegramId == null || telegramId.isEmpty()) {
+            return;
+        }
+        sendMessageTo(telegramId,
+                tgText(ConfigKeys.TG_ADMIN_LOGIN, "player", esc(playerName), "ip", esc(ip),
+                        "time", TIME_FORMAT.format(new Date(timestamp))),
+                new InlineKeyboardMarkup(allowButton(playerName), kickButton(playerName)));
+    }
+
+    /** Сообщение владельцу: три кнопки (Впустить / Кикнуть / Выдать панель). */
+    public void sendOwnerLogin(String playerName, String ip, long timestamp, boolean panelAsked) {
+        sendMessage(tgText(ConfigKeys.TG_OWNER_LOGIN, "player", esc(playerName), "ip", esc(ip),
+                        "time", TIME_FORMAT.format(new Date(timestamp))),
+                new InlineKeyboardMarkup(allowButton(playerName), kickButton(playerName), panelButton(playerName)));
+    }
+
+    /** Сообщение админу: опасная команда требует подтверждения (его собственные кнопки). */
+    public void sendDangerAskSender(String telegramId, String playerName, String command,
+                                    String actionId, int timeoutSeconds) {
+        if (telegramId == null || telegramId.isEmpty()) {
+            return;
+        }
+        sendMessageTo(telegramId,
+                tgText(ConfigKeys.TG_DANGER_SENDER, "command", esc(command), "timeout", String.valueOf(timeoutSeconds)),
+                new InlineKeyboardMarkup(
+                        new InlineKeyboardButton("❌ Отменить").callbackData("dc:cancel " + actionId)));
+    }
+
+    /** Сообщение владельцу: чужой админ выполнил опасную команду, кнопка «Отклонить» → бан. */
+    public void sendDangerAskOwner(String playerName, String command, String actionId) {
+        sendMessage(tgText(ConfigKeys.TG_DANGER_OWNER, "player", esc(playerName), "command", esc(command)),
+                new InlineKeyboardMarkup(
+                        new InlineKeyboardButton("⛔ Отклонить и забанить").callbackData("dc:reject " + actionId)));
+    }
+
+    /** Уведомление владельцу о том, что опасная команда выполнилась автоматически (таймаут). */
+    public void sendDangerExecuted(String playerName, String command) {
+        sendMessage(tgText(ConfigKeys.TG_DANGER_EXECUTED, "player", esc(playerName), "command", esc(command)), null);
+    }
+
+    private static InlineKeyboardButton allowButton(String name) {
+        return new InlineKeyboardButton("✅ Впустить").callbackData("allow " + name);
+    }
+
+    private static InlineKeyboardButton kickButton(String name) {
+        return new InlineKeyboardButton("⛔ Кикнуть").callbackData("kick " + name);
+    }
+
+    private static InlineKeyboardButton panelButton(String name) {
+        return new InlineKeyboardButton("🛠 Выдать доступ к панели").callbackData("panel " + name);
+    }
+
+    /** Текст сообщения из конфига с подстановкой плейсхолдеров. */
+    private static String tgText(String key, String... pairs) {
+        String body = Main.getCfg().getMultiLine(key);
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            body = body.replace("%" + pairs[i] + "%", pairs[i + 1]);
+        }
+        return body;
+    }
+
+    private void sendMessage(String text, InlineKeyboardMarkup markup) {
+        String chatId = Main.getCfg().getString(ConfigKeys.OWNER_TELEGRAM_ID, "");
+        if (chatId.isEmpty()) {
+            return;
+        }
+        sendMessageTo(chatId, text, markup);
+    }
+
+    void sendMessageTo(String chatId, String text, InlineKeyboardMarkup markup) {
+        try {
+            SendMessage request = new SendMessage(chatId, text);
+            request.parseMode(ParseMode.HTML);
+            if (markup != null) {
+                request.replyMarkup(markup);
+            }
+            bot.execute(request);
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Не удалось отправить сообщение в Telegram", e);
+        }
+    }
+
+    /** Экранирует HTML-спецсимволы (для подстановки в теги <b>/<code>). */
+    static String esc(String s) {
+        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private void answerCallback(String callbackId) {
-        if (callbackId == null || callbackId.isEmpty()) {
-            return;
-        }
-        JsonObject payload = new JsonObject();
-        payload.addProperty("callback_query_id", callbackId);
-        post("answerCallbackQuery", payload.toString());
-    }
-
-    private void removeInlineKeyboard(JsonObject callback) {
-        if (!callback.has("message")) {
-            return;
-        }
-        JsonObject message = callback.getAsJsonObject("message");
-        if (!message.has("chat") || !message.has("message_id")) {
-            return;
-        }
-        JsonObject payload = new JsonObject();
-        payload.addProperty("chat_id", message.getAsJsonObject("chat").get("id").getAsString());
-        payload.addProperty("message_id", message.get("message_id").getAsLong());
-        payload.add("reply_markup", new JsonObject());
-        post("editMessageReplyMarkup", payload.toString());
-    }
-
-    private JsonArray arrayOf(String value) {
-        JsonArray arr = new JsonArray();
-        arr.add(value);
-        return arr;
-    }
-
-    private JsonObject post(String method, String jsonBody) {
-        if (token.isEmpty()) {
-            return new JsonObject();
-        }
-        HttpURLConnection connection = null;
         try {
-            URL url = new URL(API_URL + token + "/" + method);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "application/json");
-            connection.setDoOutput(true);
-
-            byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
-            try (OutputStream os = connection.getOutputStream()) {
-                os.write(body);
-                os.flush();
-            }
-
-            int code = connection.getResponseCode();
-            InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
-            try (Scanner scanner = new Scanner(stream, StandardCharsets.UTF_8)) {
-                String response = scanner.hasNext() ? scanner.useDelimiter("\\A").next() : "{}";
-                return JsonParser.parseString(response).getAsJsonObject();
-            }
-        } catch (IOException e) {
-            plugin.getLogger().log(Level.WARNING, "Не удалось отправить запрос в Telegram", e);
-            return new JsonObject();
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+            bot.execute(new AnswerCallbackQuery(callbackId));
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "Не удалось ответить на callback", e);
         }
     }
 
-    private void sleepQuietly(long millis) {
+    private void removeKeyboard(CallbackQuery query) {
         try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            if (query.message() == null || query.message().chat() == null) {
+                return;
+            }
+            bot.execute(new EditMessageReplyMarkup(query.message().chat().id(),
+                    query.message().messageId()).replyMarkup(new InlineKeyboardMarkup()));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void editKeyboard(CallbackQuery query, InlineKeyboardMarkup markup) {
+        try {
+            if (query.message() == null || query.message().chat() == null) {
+                return;
+            }
+            bot.execute(new EditMessageReplyMarkup(query.message().chat().id(),
+                    query.message().messageId()).replyMarkup(markup));
+        } catch (Exception ignored) {
         }
     }
 }

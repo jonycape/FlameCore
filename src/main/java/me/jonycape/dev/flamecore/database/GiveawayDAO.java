@@ -147,8 +147,12 @@ public final class GiveawayDAO {
         }
     }
 
-    private java.sql.Connection conn() {
-        return plugin.getDatabaseManager().getConnection();
+    private java.sql.Connection conn() throws SQLException {
+        java.sql.Connection c = plugin.getDatabaseManager().getConnection();
+        if (c == null) {
+            throw new SQLException("Соединение с базой данных отсутствует");
+        }
+        return c;
     }
 
     private void error(String message, SQLException e) {

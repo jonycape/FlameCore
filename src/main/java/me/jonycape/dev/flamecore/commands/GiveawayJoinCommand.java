@@ -18,7 +18,7 @@ public final class GiveawayJoinCommand extends BaseCommand {
             sendMessage(sender, ConfigKeys.MESSAGE_GIVEAWAY_JOIN_USAGE);
             return;
         }
-        if (sender.getName().equals("CONSOLE")) {
+        if (!(sender instanceof org.bukkit.entity.Player)) {
             sender.sendMessage(MessageUtils.color(
                     Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_GIVEAWAY_CONSOLE_ONLY)));
             return;

@@ -3,6 +3,7 @@ package me.jonycape.dev.flamecore.management;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.utils.MessageUtils;
+import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -10,15 +11,12 @@ import org.bukkit.entity.Player;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 
+@RequiredArgsConstructor
 public final class ServerManagementService {
 
     private static final long START_TIME = System.currentTimeMillis();
 
     private final Main plugin;
-
-    public ServerManagementService(Main plugin) {
-        this.plugin = plugin;
-    }
 
     public String tps() {
         double[] tps = Bukkit.getTPS();
@@ -72,7 +70,7 @@ public final class ServerManagementService {
     }
 
     public void announce(String text) {
-        String prefix = Main.getCfg().getString(ConfigKeys.MESSAGE_PREFIX, "");
+        String prefix = Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_PREFIX);
         Bukkit.broadcastMessage(MessageUtils.color(prefix + text));
     }
 
@@ -117,7 +115,7 @@ public final class ServerManagementService {
     }
 
     private String raw(String key) {
-        return color(Main.getCfg().getString(key, ""));
+        return color(Main.getCfg().getMultiLine(key));
     }
 
     private String color(String s) {
