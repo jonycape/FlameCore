@@ -13,8 +13,10 @@ import me.jonycape.dev.flamecore.protection.AdminRestrictionListener;
 import me.jonycape.dev.flamecore.protection.DangerousCommandListener;
 import me.jonycape.dev.flamecore.protection.DangerousCommandService;
 import me.jonycape.dev.flamecore.protection.TelegramNotifier;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.Map;
 import java.util.logging.Level;
 
 public final class Main extends JavaPlugin {
@@ -33,6 +35,9 @@ public final class Main extends JavaPlugin {
     @Getter
     private AdminProtectionService adminProtectionService;
 
+    @Getter
+    private DangerousCommandService dangerousCommandService;
+
     @Override
     public void onEnable() {
         instance = this;
@@ -42,6 +47,12 @@ public final class Main extends JavaPlugin {
         initGiveaways();
         initCommands();
         initProtection();
+
+        Bukkit.getScheduler().runTaskTimer(this, () -> {
+            if (adminProtectionService != null) {
+                adminProtectionService.pruneExpired();
+            }
+        }, 20L, 20L);
 
         getLogger().info("FlameCore был успешно запущен.");
     }
@@ -67,7 +78,7 @@ public final class Main extends JavaPlugin {
     private void initGiveaways() {
         this.giveawayManager = new GiveawayManager(this);
         giveawayManager.init();
-        new GiveawayScheduler(this, giveawayManager).start();
+        new GiveawayScheduler(this).start();
     }
 
     private void initCommands() {
@@ -80,18 +91,16 @@ public final class Main extends JavaPlugin {
     private void initProtection() {
         this.telegramNotifier = new TelegramNotifier(this);
         this.adminProtectionService = new AdminProtectionService(this);
-        AdminProtectionListener listener = new AdminProtectionListener(this, adminProtectionService);
+        AdminProtectionListener listener = new AdminProtectionListener();
         getServer().getPluginManager().registerEvents(listener, this);
-        getServer().getPluginManager().registerEvents(new AdminRestrictionListener(adminProtectionService), this);
+        getServer().getPluginManager().registerEvents(new AdminRestrictionListener(), this);
 
-        DangerousCommandService dangerousService = new DangerousCommandService(this, adminProtectionService);
-        getServer().getPluginManager().registerEvents(
-                new DangerousCommandListener(adminProtectionService, dangerousService), this);
+        this.dangerousCommandService = new DangerousCommandService(this, adminProtectionService);
+        getServer().getPluginManager().registerEvents(new DangerousCommandListener(), this);
 
-        // Маршрутизация callback из Telegram: dc:* — опасные команды, остальное — вход/панель.
         telegramNotifier.startPolling((data, from) -> {
             if (data != null && data.startsWith("dc:")) {
-                dangerousService.handleCallback(data, from);
+                dangerousCommandService.handleCallback(data, from);
             } else {
                 listener.handleCallback(data, from);
             }
@@ -100,9 +109,19 @@ public final class Main extends JavaPlugin {
 
     public void reloadPlugin() {
         try {
+            Map<String, Long> pendingSnapshot = adminProtectionService == null
+                    ? null : adminProtectionService.pendingSnapshot();
+
             ConfigManager.getInstance().reload();
             this.adminProtectionService = new AdminProtectionService(this);
-            new GiveawayManager(this).init();
+            if (pendingSnapshot != null) {
+                adminProtectionService.restorePending(pendingSnapshot);
+            }
+            if (dangerousCommandService != null) {
+                dangerousCommandService.reload(adminProtectionService);
+            }
+            this.giveawayManager = new GiveawayManager(this);
+            giveawayManager.init();
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Ошибка при перезагрузке плагина", e);
         }

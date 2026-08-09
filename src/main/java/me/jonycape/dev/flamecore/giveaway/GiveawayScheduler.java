@@ -1,22 +1,27 @@
 package me.jonycape.dev.flamecore.giveaway;
 
-import lombok.RequiredArgsConstructor;
 import me.jonycape.dev.flamecore.Main;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@RequiredArgsConstructor
 public final class GiveawayScheduler {
 
     private final Main plugin;
-    private final GiveawayManager manager;
+
+    public GiveawayScheduler(Main plugin) {
+        this.plugin = plugin;
+    }
 
     public void start() {
         new BukkitRunnable() {
             @Override
             public void run() {
+                GiveawayManager manager = Main.getInstance() == null ? null : Main.getInstance().getGiveawayManager();
+                if (manager == null) {
+                    return;
+                }
                 long now = System.currentTimeMillis();
                 List<Giveaway> expired = new ArrayList<>();
                 for (Giveaway giveaway : manager.getActiveGiveaways()) {

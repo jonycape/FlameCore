@@ -1,5 +1,6 @@
 package me.jonycape.dev.flamecore.protection;
 
+import me.jonycape.dev.flamecore.Main;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -18,14 +19,9 @@ import org.bukkit.inventory.EquipmentSlot;
 
 public final class AdminRestrictionListener implements Listener {
 
-    private final AdminProtectionService service;
-
-    public AdminRestrictionListener(AdminProtectionService service) {
-        this.service = service;
-    }
-
     private boolean blocked(Player player) {
-        return service.isPendingLogin(player.getName());
+        AdminProtectionService service = Main.getInstance() == null ? null : Main.getInstance().getAdminProtectionService();
+        return service != null && service.isPendingLogin(player.getName());
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)

@@ -84,7 +84,6 @@ public final class ConfigManager {
         return value == null ? "" : String.valueOf(value);
     }
 
-    /** Читает секцию как карту "ключ (в нижнем регистре) → строка". */
     public Map<String, String> getStringMap(String path) {
         Object value = cache.get(path);
         if (value instanceof org.bukkit.configuration.ConfigurationSection section) {

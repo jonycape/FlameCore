@@ -4,54 +4,37 @@ import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.management.SessionManager;
 import me.jonycape.dev.flamecore.utils.MessageUtils;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.title.Title;
+import net.kyori.adventure.util.Ticks;
+import org.bukkit.Bukkit;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-import java.util.logging.FileHandler;
-import java.util.logging.Formatter;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class AdminProtectionService {
 
     private final Main plugin;
-    /** Секция "admins" — карта "ник → Telegram ID" (ники в нижнем регистре). */
     private final Map<String, String> admins;
-    private final Set<String> pendingLogins;
+    private final Map<String, Long> pendingLogins;
+    private final Map<String, BossBar> bars;
     private final String ownerName;
-    private final Logger logger;
+    private final long loginTimeoutMs;
 
     public AdminProtectionService(Main plugin) {
         this.plugin = plugin;
         this.admins = new HashMap<>(Main.getCfg().getStringMap(ConfigKeys.ADMINS));
-        this.pendingLogins = new HashSet<>();
+        this.pendingLogins = new ConcurrentHashMap<>();
+        this.bars = new ConcurrentHashMap<>();
         this.ownerName = Main.getCfg().getString(ConfigKeys.OWNER_NAME, "").toLowerCase();
-        this.logger = createLogger();
-    }
-
-    private Logger createLogger() {
-        Logger log = Logger.getLogger("me.jonycape.dev.flamecore.AdminProtection");
-        File logsDir = new File(plugin.getDataFolder(), "logs");
-        logsDir.mkdirs();
-        try {
-            FileHandler handler =
-                    new FileHandler(new File(logsDir, "admin_protection.log").getAbsolutePath(), true);
-            handler.setFormatter(new TimestampFormatter());
-            log.addHandler(handler);
-            log.setUseParentHandlers(false);
-            log.setLevel(Level.INFO);
-        } catch (IOException e) {
-            log.log(Level.WARNING, "Не удалось инициализировать лог-файл защиты администратора", e);
-        }
-        return log;
+        this.loginTimeoutMs = Math.max(10, Main.getCfg().getInt(ConfigKeys.LOGIN_TIMEOUT, 90)) * 1000L;
     }
 
     public boolean isAdmin(String name) {
@@ -62,7 +45,6 @@ public final class AdminProtectionService {
         return name != null && name.equalsIgnoreCase(ownerName);
     }
 
-    /** Telegram ID администратора по нику, или null если его нет в конфиге. */
     public String getTelegramId(String name) {
         return admins.get(name.toLowerCase());
     }
@@ -73,58 +55,60 @@ public final class AdminProtectionService {
         }
         String ip = player.getAddress() != null
                 ? player.getAddress().getAddress().getHostAddress() : "неизвестен";
-        log("ЗАПРОС ВХОДА — админ: " + player.getName() + ", IP: " + ip + ", время: " + now());
-
-        pendingLogins.add(player.getName().toLowerCase());
+        long expiresAt = System.currentTimeMillis() + loginTimeoutMs;
+        pendingLogins.put(player.getName().toLowerCase(), expiresAt);
         freezePlayer(player);
+        log("ЗАПРОС ВХОДА — " + player.getName() + ", IP: " + ip);
 
         if (isOwner(player.getName())) {
             plugin.getTelegramNotifier().sendOwnerLogin(
-                    player.getName(), ip, System.currentTimeMillis(), true);
+                    player.getName(), ip, expiresAt, true);
         } else {
-            // Отправляем уведомление самому админу в его личку (по его Telegram ID).
             String adminTelegramId = admins.get(player.getName().toLowerCase());
             if (adminTelegramId != null && !adminTelegramId.isEmpty()) {
                 plugin.getTelegramNotifier().sendAdminLogin(
-                        adminTelegramId, player.getName(), ip, System.currentTimeMillis());
+                        adminTelegramId, player.getName(), ip, expiresAt);
             }
         }
         notifyWaiting(player);
+        showBar(player);
     }
 
     public void onPlayerQuit(Player player) {
         String name = player.getName().toLowerCase();
         SessionManager.revoke(name);
         pendingLogins.remove(name);
+        hideBar(player);
         unfreezePlayer(player);
-        log("ВЫХОД — " + player.getName() + ", доступ сброшен, время: " + now());
     }
 
     public void approveAdmin(Player player) {
-        if (player == null || !player.isOnline()) {
+        if (player == null || !isPendingLogin(player.getName())) {
             return;
         }
         pendingLogins.remove(player.getName().toLowerCase());
+        hideBar(player);
         unfreezePlayer(player);
-        player.sendMessage(MessageUtils.color(
-                MessageUtils.replace(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_APPROVED),
-                        "player", player.getName())));
-        log("Вход администратора ПОДТВЕРЖДЁН: " + player.getName() + ", время: " + now());
+        player.sendMessage(MessageUtils.color(MessageUtils.replace(
+                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_APPROVED), "player", player.getName())));
+        log("Вход ПОДТВЕРЖДЁН: " + player.getName());
     }
 
     public void kickAdmin(Player player) {
         if (player == null) {
             return;
         }
+        boolean wasPending = isPendingLogin(player.getName());
+        pendingLogins.remove(player.getName().toLowerCase());
+        hideBar(player);
+        unfreezePlayer(player);
         if (player.isOnline()) {
-            pendingLogins.remove(player.getName().toLowerCase());
-            unfreezePlayer(player);
-            player.kick(net.kyori.adventure.text.Component.text(
+            player.kick(LegacyComponentSerializer.legacySection().deserialize(
                     MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_DENIED))));
-        } else {
-            pendingLogins.remove(player.getName().toLowerCase());
         }
-        log("Вход администратора ОТКЛОНЁН (кик): " + player.getName() + ", время: " + now());
+        if (wasPending) {
+            log("Вход ОТКЛОНЁН (кик): " + player.getName());
+        }
     }
 
     public void grantPanelAccess(Player player) {
@@ -133,23 +117,60 @@ public final class AdminProtectionService {
         }
         SessionManager.grant(player.getName());
         pendingLogins.remove(player.getName().toLowerCase());
+        hideBar(player);
         unfreezePlayer(player);
-        player.sendMessage(MessageUtils.color(
-                MessageUtils.replace(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_OWNER_PANEL_GRANTED),
-                        "player", player.getName())));
-        log("Владельцу выдана панель управления: " + player.getName() + ", время: " + now());
+        player.sendMessage(MessageUtils.color(MessageUtils.replace(
+                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_OWNER_PANEL_GRANTED), "player", player.getName())));
+        log("Панель выдана: " + player.getName());
     }
 
     public boolean isPendingLogin(String name) {
-        return pendingLogins.contains(name.toLowerCase());
+        Long expiresAt = pendingLogins.get(name.toLowerCase());
+        if (expiresAt == null) {
+            return false;
+        }
+        if (expiresAt <= System.currentTimeMillis()) {
+            pendingLogins.remove(name.toLowerCase());
+            return false;
+        }
+        return true;
+    }
+
+    public void pruneExpired() {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<String, Long> entry : pendingLogins.entrySet()) {
+            if (entry.getValue() <= now) {
+                pendingLogins.remove(entry.getKey());
+                Player player = Bukkit.getPlayerExact(entry.getKey());
+                if (player != null) {
+                    hideBar(player);
+                    unfreezePlayer(player);
+                    log("Вход просрочен, игрок разморожен: " + player.getName());
+                }
+            }
+        }
+    }
+
+    public Map<String, Long> pendingSnapshot() {
+        return new HashMap<>(pendingLogins);
+    }
+
+    public void restorePending(Map<String, Long> snapshot) {
+        if (snapshot == null || snapshot.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Long> entry : snapshot.entrySet()) {
+            if (entry.getValue() > System.currentTimeMillis()) {
+                pendingLogins.put(entry.getKey(), entry.getValue());
+            }
+        }
     }
 
     private void freezePlayer(Player player) {
-        if (player.hasPotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS)) {
-            player.removePotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS);
+        if (player.hasPotionEffect(PotionEffectType.BLINDNESS)) {
+            player.removePotionEffect(PotionEffectType.BLINDNESS);
         }
-        player.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                org.bukkit.potion.PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 0, false, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 0, false, false, false));
         player.setWalkSpeed(0.0F);
     }
 
@@ -157,41 +178,38 @@ public final class AdminProtectionService {
         if (player == null || !player.isOnline()) {
             return;
         }
-        player.removePotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS);
+        player.removePotionEffect(PotionEffectType.BLINDNESS);
         player.setWalkSpeed(0.2F);
         player.setInvulnerable(false);
     }
 
     private void notifyWaiting(Player player) {
-        player.sendMessage(MessageUtils.color(
-                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING)));
-        player.showTitle(net.kyori.adventure.title.Title.title(
-                net.kyori.adventure.text.Component.text(
-                        MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_TITLE))),
-                net.kyori.adventure.text.Component.text(
-                        MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_SUBTITLE))),
-                net.kyori.adventure.title.Title.Times.times(
-                        net.kyori.adventure.util.Ticks.duration(10),
-                        net.kyori.adventure.util.Ticks.duration(100),
-                        net.kyori.adventure.util.Ticks.duration(10))));
+        player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING)));
+        LegacyComponentSerializer legacy = LegacyComponentSerializer.legacySection();
+        player.showTitle(Title.title(
+                legacy.deserialize(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_TITLE))),
+                legacy.deserialize(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_SUBTITLE))),
+                Title.Times.times(Ticks.duration(10), Ticks.duration(100), Ticks.duration(10))));
         player.setInvulnerable(true);
     }
 
-    private void log(String message) {
-        logger.log(Level.INFO, message);
+    private void showBar(Player player) {
+        BossBar bar = Bukkit.createBossBar(
+                MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_TITLE)),
+                BarColor.YELLOW, BarStyle.SOLID);
+        bar.addPlayer(player);
+        bars.put(player.getName().toLowerCase(), bar);
     }
 
-    private String now() {
-        return new SimpleDateFormat("dd.MM.yyyy HH:mm:ss").format(new Date());
-    }
-
-    private static final class TimestampFormatter extends Formatter {
-        private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
-        @Override
-        public String format(LogRecord record) {
-            return "[" + dateFormat.format(new Date(record.getMillis())) + "] "
-                    + record.getMessage() + System.lineSeparator();
+    private void hideBar(Player player) {
+        BossBar bar = bars.remove(player.getName().toLowerCase());
+        if (bar != null) {
+            bar.removePlayer(player);
+            bar.setVisible(false);
         }
+    }
+
+    private void log(String message) {
+        plugin.getLogger().info(message);
     }
 }

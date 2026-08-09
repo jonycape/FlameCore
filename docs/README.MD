@@ -48,10 +48,10 @@ src/main/java/me/jonycape/dev/flamecore/
 │   ├── ServerManagementService.java  — tps/mspt/system/online/worlds/check/player/announce
 │   └── SessionManager.java           — доступ к панели (ConcurrentHashMap)
 ├── protection/
-│   ├── AdminProtectionService.java   — логика защиты, pendingLogins, карта ники→TG ID, заморозка
+│   ├── AdminProtectionService.java   — логика защиты, pendingLogins (TTL map), карта ники→TG ID, заморозка
 │   ├── AdminProtectionListener.java  — события join/quit + колбэки Telegram (allow/kick/panel)
 │   ├── AdminRestrictionListener.java — блокировка действий у админа в ожидании
-│   ├── DangerousCommandService.java  — перехват опасных команд (pending, cancel/reject, бан, лог)
+│   ├── DangerousCommandService.java  — перехват опасных команд (pending, cancel/reject, бан)
 │   ├── DangerousCommandListener.java — PlayerCommandPreprocessEvent (LOWEST)
 │   └── TelegramNotifier.java         — Telegram Long Polling, кнопки, HTML-экранирование
 └── utils/
@@ -70,11 +70,15 @@ src/main/java/me/jonycape/dev/flamecore/
 
 При входе админа/владельца (`onPlayerJoin`):
 
-1. Имя добавляется в `pendingLogins` (приватный `Set<String>` в сервисе).
+1. Имя добавляется в `pendingLogins` — **карта ник(lower)→expiresAt** (хранение с **TTL**).
+   Время жизни = `protection.login-timeout` (сек, дефолт 90).
 2. `freezePlayer(player)`: `BLINDNESS` (`Integer.MAX_VALUE` тиков, без частиц),
    `walkSpeed = 0.0F`, `setInvulnerable(true)`.
 3. В Telegram уходит запрос входа.
 4. Игроку показывается title+subtitle (`admin-waiting-title`/`admin-waiting-subtitle`).
+
+**TTL/просрочка:** главный `Main` каждую секунду зовёт `pruneExpired()` — убирает записи,
+чей `expiresAt` истёк, и **размораживает** игрока (иначе админ завис бы навсегда при «тихом» отказе).
 
 **`AdminRestrictionListener`** отменяет всё, пока игрок в `pendingLogins`:
 `PlayerMoveEvent` (телепорт назад), `PlayerInteractEvent`, `PlayerInteractEntityEvent`,
@@ -82,11 +86,26 @@ src/main/java/me/jonycape/dev/flamecore/
 `PlayerSwapHandItemsEvent`.
 
 **Разморозка:** `approveAdmin` («Впустить») снимает слепоту, `walkSpeed = 0.2F`,
-`setInvulnerable(false)`. `kickAdmin` кикает. `grantPanelAccess` размораживает владельца
-и даёт доступ к панели. `onPlayerQuit` чистит состояние.
+`setInvulnerable(false)`. `kickAdmin` кикает. `grantPanelAccess` размораживает и даёт доступ
+к панели (НЕ требует pending-статуса — работает и после «Впустить»). `onPlayerQuit` чистит состояние.
 
-> ⚠️ `pendingLogins` хранится в `AdminProtectionService`. `SessionManager` отвечает только
-> за **доступ к панели** (раздаётся кнопкой «Выдать доступ к панели»).
+> ⚠️ `pendingLogins` хранится в `AdminProtectionService` — теперь это `ConcurrentHashMap` (TTL).
+> `SessionManager` отвечает только за **доступ к панели**.
+
+### 3.1a Все слушатели тянут сервисы из Main (fix reload)
+
+`AdminProtectionListener`, `AdminRestrictionListener`, `DangerousCommandListener` больше **не держат
+ссылку** на `AdminProtectionService`/`DangerousCommandService` в конструкторе, а берут их через
+`Main.getInstance().get…()` на каждый вызов. Это чинит старую проблему: после `/flamecore reload`
+создавался новый сервис, а слушатели продолжали работать со старым (заморозка ломалась).
+
+`Main.reloadPlugin()`:
+- снимает снапшот `pendingSnapshot()` до пересоздания сервиса;
+- создаёт новый `AdminProtectionService`, восстанавливает снапшот через `restorePending(snapshot)`
+  (только неистёкшие записи);
+- зовёт `dangerousCommandService.reload(новыйСервис)` — обновляет ссылку на админов
+  и заново пересобирает паттерны dangerous-команд;
+- пересоздаёт `GiveawayManager` (пул-схедyлер берёт его динамически из `Main`).
 
 ### 3.2 Кнопки Telegram владельца (3 кнопки)
 
@@ -127,8 +146,9 @@ src/main/java/me/jonycape/dev/flamecore/
     «Защита сработала, за обжалованием в админ-чат.», запись в лог.
 - По таймауту `resolveTimeout` (если не отменено/не отклонено) — команда выполняется
   автоматически через `Bukkit.dispatchCommand`.
-- Всё логируется в `plugins/FlameCore/logs/dangerous_command.log`.
 - **Команды бана НЕ включены** в dangerous-commands — модераторы багят игроков без подтверждения.
+- `cancel`/`reject` идемпотентны: `pending.remove(id)` атомарен, повторное нажатие без влияния.
+- `reload(AdminProtectionService)` пересобирает паттерны без пересоздания сервиса.
 
 ### 3.4 Сообщения настраиваемые + HTML-безопасность
 
@@ -162,10 +182,22 @@ src/main/java/me/jonycape/dev/flamecore/
 
 - [ ] **Проверить в бою** 3 кнопки владельца и сжатие клавиатуры после «Впустить».
 - [ ] Проверить в бою защиту опасных команд: авто-выполнение по таймауту и бан по «Отклонить».
-- [ ] Двойное/быстрое нажатие кнопок — не создаёт повторное окно/повторную обработку.
-- [ ] TTL для `pendingLogins` (сейчас запись висит, пока игрок не вышел/не нажали кнопку).
-- [ ] `reloadPlugin()` не восстанавливает `pendingLogins` для уже онлайн-админов.
-- [ ] Проверить `GiveawayScheduler` (завершение по таймеру) и `ParticipantDAO`.
+- [ ] Проверить в бою TTL входа (`protection.login-timeout`) — авто-разморозка по таймауту.
+
+> Сделано в этот заход: убраны все java-комментарии из классов; TTL pendingLogins +
+> авто-прунинг; починка reload (слушатели тянут сервисы из Main, восстановление pending,
+> пересборка dangerous-паттернов); идемпотентность кнопок; убран N+1 из loadAll
+> (GiveawayDAO больше не тянет участников); дары/схедyлер берут менеджера динамически.
+>
+> Починены пустые **тайтл/боссбар**: `Component.text(coloredString)` выводил `§` дословно,
+> а не цвет. Теперь title/subtitle/кик-причина строятся через
+> `LegacyComponentSerializer.legacySection().deserialize(...)`, а на время ожидания вешается
+> **BossBar** (жёлтый, с текстом `admin-waiting-title`), убирается при approve/kick/grant/quit/expire
+> (`bars` map в `AdminProtectionService`).
+>
+> **Telegram**: в `telegram-messages` переведено на цитаты `<blockquote>` (команда),
+> в опасные сообщения добавлен плейсхолдер `%time%` и время (sendDangerAskSender/Owner).
+> `protection.login-timeout` — TTL входа в конфиге.
 
 ---
 

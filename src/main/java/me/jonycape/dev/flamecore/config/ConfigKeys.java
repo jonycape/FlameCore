@@ -18,6 +18,7 @@ public final class ConfigKeys {
 
     public static final String DANGEROUS_COMMANDS = "protection.dangerous-commands";
     public static final String DANGEROUS_CONFIRM_TIMEOUT = "protection.confirm-timeout";
+    public static final String LOGIN_TIMEOUT = "protection.login-timeout";
 
     public static final String TG_ADMIN_LOGIN = "telegram-messages.admin-login";
     public static final String TG_OWNER_LOGIN = "telegram-messages.owner-login";

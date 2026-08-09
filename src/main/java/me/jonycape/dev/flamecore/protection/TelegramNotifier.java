@@ -20,10 +20,6 @@ import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 
-/**
- * Отправка и приём сообщений Telegram через библиотеку com.pengrad:java-telegram-bot-api
- * (лёгкий транспорт на OkHttp — без тяжёлых зависимостей в отличие от org.telegram).
- */
 public final class TelegramNotifier {
 
     private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
@@ -85,7 +81,6 @@ public final class TelegramNotifier {
         }
     }
 
-    /** Поведение клавиатуры после нажатия кнопки (логика владельца). */
     private void afterCallbackKeyboard(CallbackQuery query, String data) {
         if (data.startsWith("dc:")) {
             removeKeyboard(query);
@@ -100,14 +95,12 @@ public final class TelegramNotifier {
         String ownerName = Main.getCfg().getString(ConfigKeys.OWNER_NAME, "");
         boolean ownerPress = !ownerName.isEmpty() && ownerName.equalsIgnoreCase(playerName);
         if ("allow".equals(action) && ownerPress) {
-            // Владелец нажал «Впустить»: убираем «Впустить» и «Кикнуть», но оставляем «Выдать панель».
             editKeyboard(query, new InlineKeyboardMarkup(panelButton(playerName)));
         } else {
             removeKeyboard(query);
         }
     }
 
-    /** Сообщение для самого администратора (отправляется в личку админа). */
     public void sendAdminLogin(String telegramId, String playerName, String ip, long timestamp) {
         if (telegramId == null || telegramId.isEmpty()) {
             return;
@@ -118,33 +111,31 @@ public final class TelegramNotifier {
                 new InlineKeyboardMarkup(allowButton(playerName), kickButton(playerName)));
     }
 
-    /** Сообщение владельцу: три кнопки (Впустить / Кикнуть / Выдать панель). */
     public void sendOwnerLogin(String playerName, String ip, long timestamp, boolean panelAsked) {
         sendMessage(tgText(ConfigKeys.TG_OWNER_LOGIN, "player", esc(playerName), "ip", esc(ip),
                         "time", TIME_FORMAT.format(new Date(timestamp))),
                 new InlineKeyboardMarkup(allowButton(playerName), kickButton(playerName), panelButton(playerName)));
     }
 
-    /** Сообщение админу: опасная команда требует подтверждения (его собственные кнопки). */
     public void sendDangerAskSender(String telegramId, String playerName, String command,
-                                    String actionId, int timeoutSeconds) {
+                                    String actionId, int timeoutSeconds, long timestamp) {
         if (telegramId == null || telegramId.isEmpty()) {
             return;
         }
         sendMessageTo(telegramId,
-                tgText(ConfigKeys.TG_DANGER_SENDER, "command", esc(command), "timeout", String.valueOf(timeoutSeconds)),
+                tgText(ConfigKeys.TG_DANGER_SENDER, "command", esc(command),
+                        "timeout", String.valueOf(timeoutSeconds), "time", TIME_FORMAT.format(new Date(timestamp))),
                 new InlineKeyboardMarkup(
                         new InlineKeyboardButton("❌ Отменить").callbackData("dc:cancel " + actionId)));
     }
 
-    /** Сообщение владельцу: чужой админ выполнил опасную команду, кнопка «Отклонить» → бан. */
-    public void sendDangerAskOwner(String playerName, String command, String actionId) {
-        sendMessage(tgText(ConfigKeys.TG_DANGER_OWNER, "player", esc(playerName), "command", esc(command)),
+    public void sendDangerAskOwner(String playerName, String command, String actionId, long timestamp) {
+        sendMessage(tgText(ConfigKeys.TG_DANGER_OWNER, "player", esc(playerName), "command", esc(command),
+                        "time", TIME_FORMAT.format(new Date(timestamp))),
                 new InlineKeyboardMarkup(
                         new InlineKeyboardButton("⛔ Отклонить и забанить").callbackData("dc:reject " + actionId)));
     }
 
-    /** Уведомление владельцу о том, что опасная команда выполнилась автоматически (таймаут). */
     public void sendDangerExecuted(String playerName, String command) {
         sendMessage(tgText(ConfigKeys.TG_DANGER_EXECUTED, "player", esc(playerName), "command", esc(command)), null);
     }
@@ -161,7 +152,6 @@ public final class TelegramNotifier {
         return new InlineKeyboardButton("🛠 Выдать доступ к панели").callbackData("panel " + name);
     }
 
-    /** Текст сообщения из конфига с подстановкой плейсхолдеров. */
     private static String tgText(String key, String... pairs) {
         String body = Main.getCfg().getMultiLine(key);
         for (int i = 0; i + 1 < pairs.length; i += 2) {
@@ -191,7 +181,6 @@ public final class TelegramNotifier {
         }
     }
 
-    /** Экранирует HTML-спецсимволы (для подстановки в теги <b>/<code>). */
     static String esc(String s) {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }

@@ -52,7 +52,6 @@ public final class GiveawayDAO {
                         .id(id)
                         .prize(rs.getString("prize"))
                         .endTime(rs.getLong("end_time"))
-                        .participants(loadParticipants(id))
                         .build();
             }
         } catch (SQLException e) {
@@ -67,43 +66,16 @@ public final class GiveawayDAO {
         try (Statement st = conn().createStatement();
              ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                String id = rs.getString("id");
                 result.add(Giveaway.builder()
-                        .id(id)
+                        .id(rs.getString("id"))
                         .prize(rs.getString("prize"))
                         .endTime(rs.getLong("end_time"))
-                        .participants(loadParticipants(id))
                         .build());
             }
         } catch (SQLException e) {
             error("Не удалось загрузить список конкурсов", e);
         }
         return result;
-    }
-
-    public void addParticipant(String giveawayId, String playerNick) {
-        String sql = "INSERT INTO participants (giveaway_id, player) VALUES (?, ?)";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
-            ps.setString(1, giveawayId);
-            ps.setString(2, playerNick);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            error("Не удалось добавить участника " + playerNick, e);
-        }
-    }
-
-    public boolean hasParticipant(String giveawayId, String playerNick) {
-        String sql = "SELECT 1 FROM participants WHERE giveaway_id = ? AND player = ?";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
-            ps.setString(1, giveawayId);
-            ps.setString(2, playerNick);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            error("Ошибка проверки участия в конкурсе " + giveawayId, e);
-            return false;
-        }
     }
 
     public void deleteGiveaway(String giveawayId) {
@@ -121,22 +93,6 @@ public final class GiveawayDAO {
         } catch (SQLException e) {
             error("Не удалось удалить конкурс " + giveawayId, e);
         }
-    }
-
-    private List<String> loadParticipants(String id) {
-        List<String> players = new ArrayList<>();
-        String sql = "SELECT player FROM participants WHERE giveaway_id = ?";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
-            ps.setString(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    players.add(rs.getString("player"));
-                }
-            }
-        } catch (SQLException e) {
-            error("Не удалось загрузить участников конкурса " + id, e);
-        }
-        return players;
     }
 
     private void execute(String sql) {
