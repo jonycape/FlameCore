@@ -70,6 +70,15 @@ public final class ConfigManager {
         }
     }
 
+    public double getDouble(String path, double def) {
+        Object value = cache.get(path);
+        try {
+            return value == null ? def : Double.parseDouble(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public List<String> getStringList(String path) {
         Object value = cache.get(path);
@@ -82,6 +91,12 @@ public final class ConfigManager {
             return String.join("\n", ((List<String>) value));
         }
         return value == null ? "" : String.valueOf(value);
+    }
+
+    public org.bukkit.configuration.ConfigurationSection getSection(String path) {
+        Object value = cache.get(path);
+        return value instanceof org.bukkit.configuration.ConfigurationSection
+                ? (org.bukkit.configuration.ConfigurationSection) value : null;
     }
 
     public Map<String, String> getStringMap(String path) {

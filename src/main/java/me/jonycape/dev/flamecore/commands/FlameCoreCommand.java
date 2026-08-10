@@ -4,8 +4,10 @@ import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.management.ServerManagementService;
 import me.jonycape.dev.flamecore.management.SessionManager;
+import me.jonycape.dev.flamecore.customize.CustomizeService;
 import me.jonycape.dev.flamecore.utils.MessageUtils;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
@@ -17,7 +19,8 @@ import java.util.List;
 public final class FlameCoreCommand extends BaseCommand implements TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
-            "tps", "mspt", "system", "online", "worlds", "announce", "player", "check", "reload");
+            "tps", "mspt", "system", "online", "worlds", "announce", "player", "check", "reload",
+            "customize", "stream");
 
     private final ServerManagementService management;
 
@@ -38,6 +41,13 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
             return handleConsole(sender, sub);
         }
 
+        if (sub.equals("customize")) {
+            return handleCustomize(player, args);
+        }
+        if (sub.equals("stream")) {
+            return handleStream(player, args);
+        }
+
         if (!isOwner(player)) {
             sendMessage(sender, ConfigKeys.MESSAGE_NO_PERMISSION);
             return true;
@@ -48,6 +58,49 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
         }
 
         return handleSubcommand(sender, sub, args);
+    }
+
+    private boolean handleCustomize(Player player, String[] args) {
+        if (!player.hasPermission(ConfigKeys.PERM_CUSTOMIZE)) {
+            sendMessage(player, ConfigKeys.MESSAGE_NO_PERMISSION);
+            return true;
+        }
+        if (args.length < 2) {
+            plugin.getCustomizeService().menu(player);
+            return true;
+        }
+        CustomizeService service = plugin.getCustomizeService();
+        switch (args[1].toLowerCase()) {
+            case "color":
+                if (args.length < 3) {
+                    service.menu(player);
+                } else {
+                    service.setColor(player, args[2]);
+                }
+                return true;
+            case "parrot":
+                service.toggleParrot(player);
+                return true;
+            case "nimb":
+                service.toggleNimb(player);
+                return true;
+            default:
+                service.menu(player);
+                return true;
+        }
+    }
+
+    private boolean handleStream(Player player, String[] args) {
+        if (!player.hasPermission(ConfigKeys.PERM_STREAM)) {
+            sendMessage(player, ConfigKeys.MESSAGE_NO_PERMISSION);
+            return true;
+        }
+        if (args.length < 2) {
+            sendMessage(player, ConfigKeys.MESSAGE_STREAM_USAGE);
+            return true;
+        }
+        plugin.getStreamService().announce(player, args[1]);
+        return true;
     }
 
     private boolean handleSubcommand(CommandSender sender, String sub, String[] args) {
@@ -145,6 +198,23 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
             for (Player online : Bukkit.getOnlinePlayers()) {
                 if (online.getName().toLowerCase().startsWith(prefix)) {
                     completions.add(online.getName());
+                }
+            }
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("customize")) {
+            String prefix = args[1].toLowerCase();
+            for (String opt : List.of("color", "parrot", "nimb")) {
+                if (opt.startsWith(prefix)) {
+                    completions.add(opt);
+                }
+            }
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("customize")
+                && args[1].equalsIgnoreCase("color")) {
+            String prefix = args[2].toLowerCase();
+            if (plugin.getCustomizeService() != null) {
+                for (String color : plugin.getCustomizeService().getColorNames()) {
+                    if (color.startsWith(prefix)) {
+                        completions.add(color);
+                    }
                 }
             }
         }

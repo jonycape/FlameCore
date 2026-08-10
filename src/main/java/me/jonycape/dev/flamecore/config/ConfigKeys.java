@@ -61,4 +61,35 @@ public final class ConfigKeys {
     public static final String MESSAGE_MANAGEMENT_PLAYER_NOT_FOUND = "messages.management-player-not-found";
     public static final String MESSAGE_MANAGEMENT_CHECK = "messages.management-check";
     public static final String MESSAGE_MANAGEMENT_RELOAD = "messages.management-reload";
+
+    public static final String PROMO_CODES = "promo-codes";
+
+    public static final String MESSAGE_PROMO_ACTIVATED = "messages.promo-activated";
+    public static final String MESSAGE_PROMO_ALREADY_USED = "messages.promo-already-used";
+    public static final String MESSAGE_PROMO_NOT_FOUND = "messages.promo-not-found";
+    public static final String MESSAGE_PROMO_TITLE = "messages.promo-title";
+    public static final String MESSAGE_PROMO_SUBTITLE = "messages.promo-subtitle";
+
+    public static final String CUSTOMIZE_GLOW_INTERVAL = "customize.glow-interval";
+    public static final String CUSTOMIZE_NIMB_INTERVAL = "customize.nimb-interval";
+    public static final String CUSTOMIZE_NIMB_RADIUS = "customize.nimb-radius";
+    public static final String CUSTOMIZE_NIMB_PARTICLES = "customize.nimb-particles";
+    public static final String CUSTOMIZE_PARROT_INTERVAL = "customize.parrot-interval";
+
+    public static final String MESSAGE_CUSTOMIZE_MENU = "messages.customize-menu";
+    public static final String MESSAGE_CUSTOMIZE_COLOR_SET = "messages.customize-color-set";
+    public static final String MESSAGE_CUSTOMIZE_INVALID_COLOR = "messages.customize-invalid-color";
+    public static final String MESSAGE_CUSTOMIZE_PARROT_ON = "messages.customize-parrot-on";
+    public static final String MESSAGE_CUSTOMIZE_PARROT_OFF = "messages.customize-parrot-off";
+    public static final String MESSAGE_CUSTOMIZE_NIMB_ON = "messages.customize-nimb-on";
+    public static final String MESSAGE_CUSTOMIZE_NIMB_OFF = "messages.customize-nimb-off";
+
+    public static final String STREAM_COOLDOWN = "stream.cooldown";
+    public static final String MESSAGE_STREAM_BROADCAST = "messages.stream-broadcast";
+    public static final String MESSAGE_STREAM_USAGE = "messages.stream-usage";
+    public static final String MESSAGE_STREAM_COOLDOWN = "messages.stream-cooldown";
+    public static final String MESSAGE_STREAM_CONSOLE_ONLY = "messages.stream-console-only";
+
+    public static final String PERM_CUSTOMIZE = "flamecore.customize";
+    public static final String PERM_STREAM = "flamecore.stream";
 }

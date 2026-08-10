@@ -12,6 +12,7 @@ target/
 # Compiled output / OS
 *.class
 *.jar
+bin/
 !.mvn/wrapper/maven-wrapper.jar
 *.log
 .DS_Store
