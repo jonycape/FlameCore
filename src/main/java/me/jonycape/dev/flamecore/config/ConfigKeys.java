@@ -19,6 +19,7 @@ public final class ConfigKeys {
     public static final String DANGEROUS_COMMANDS = "protection.dangerous-commands";
     public static final String DANGEROUS_CONFIRM_TIMEOUT = "protection.confirm-timeout";
     public static final String LOGIN_TIMEOUT = "protection.login-timeout";
+    public static final String KICK_NON_ADMIN_PERMISSIONS = "protection.kick-non-admin-permissions";
 
     public static final String TG_ADMIN_LOGIN = "telegram-messages.admin-login";
     public static final String TG_OWNER_LOGIN = "telegram-messages.owner-login";
@@ -49,6 +50,8 @@ public final class ConfigKeys {
     public static final String MESSAGE_ADMIN_WAITING_SUBTITLE = "messages.admin-waiting-subtitle";
     public static final String MESSAGE_OWNER_PANEL_GRANTED = "messages.owner-panel-granted";
     public static final String MESSAGE_OWNER_PANEL_DENIED = "messages.owner-panel-denied";
+    public static final String MESSAGE_KICK_NOT_ADMIN = "messages.kick-not-admin";
+    public static final String TG_KICK_NON_ADMIN = "telegram-messages.kick-non-admin";
 
     public static final String MESSAGE_MANAGEMENT_INFO = "messages.management-info";
     public static final String MESSAGE_MANAGEMENT_USAGE = "messages.management-usage";

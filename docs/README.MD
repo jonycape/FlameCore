@@ -12,6 +12,7 @@
 Задачи, над которыми работали:
 
 - Защита входа админов/владельца через **Telegram-бота** (Long Polling).
+- **Кик не-админов с запрещёнными пермишенами** (op/фулл-права/groups) — кик на входе + алерт владельцу.
 - **Заморозка** админа на входе, пока доступ не подтверждён в Telegram.
 - **Защита опасных команд** (двойное подтверждение, бан при отказе владельца).
 - Красивые многострочные сообщения с поддержкой **HEX-цветов** и **HTML** в TG.
@@ -247,6 +248,20 @@ src/main/java/me/jonycape/dev/flamecore/
 > либа шлёт `GetUpdates ... 404 Not Found` (такого бота нет). Ожидаемо, лечится реальным токеном
 > от `@BotFather` + `/flamecore reload`.
 
+### 3.10 Кик не-админов с запрещёнными пермишенами
+
+**Где:** `AdminProtectionService.onPlayerJoin`/`hasForbiddenPermission`/`kickNonAdmin`,
+`TelegramNotifier.sendKickNonAdmin`, `ConfigKeys.KICK_NON_ADMIN_PERMISSIONS`.
+
+- В `onPlayerJoin`, если игрок **не в `admins`** и **не владелец** — проверяется `hasForbiddenPermission`:
+  1. `player.isOp()` → всегда кик (независимо от списка);
+  2. далее проход по списку `protection.kick-non-admin-permissions` — если `player.hasPermission(perm)` → кик.
+- `kickNonAdmin`: лог в консоль + `sendKickNonAdmin` владельцу (TG-текст `telegram-messages.kick-non-admin`,
+  плейсхолдеры `%player%`, `%ip%`, `%time%`) + `player.kick` (текст `messages.kick-not-admin`).
+- Зарегистрированы админы и владелец этой проверкой **не задеваются** — для них идёт обычный путь freeze/approve.
+- Вызов происходит на входе (HIGHEST), игрок ещё online → `kick()` работает.
+- Пермишены в конфиге: `*`, `minecraft/bukkit.command.op`, `luckperms.*`, `group.admin` (пример, поправимо под нужды).
+
 ---
 
 ## 4. Что доделать ЗАВТРА (TODO)
@@ -256,7 +271,12 @@ src/main/java/me/jonycape/dev/flamecore/
 - [ ] Проверить в бою TTL входа (`protection.login-timeout`) — авто-разморозка по таймауту.
 - [ ] Проверить в бою промокоды (фейерверк, лимит на игрока), косметику (цвета GLOW/попугай/нимб)
       и анонсы стримов (кулдаун).
-- [ ] Вставить реальный токен бота (`bot.token`) — иначе `GetUpdates 404`.
+- [ ] Вставить реальный токен бота (`bot.token`) — иначе `GetUpdates 404`. *(DONE — на тест-сервере)*
+- [ ] Проверить в бою **кик не-админов с запрещённым пермишеном** (в т.ч. op) и алерт владельцу.
+
+> Сделано в это утро: кик не-админов с запрещёнными пермишенами — `AdminProtectionService`
+> (op + список `protection.kick-non-admin-permissions`), TG-алерт владельцу и кик-сообщение
+> `messages.kick-not-admin`. Промокоды/косметика/стримы уже проверяются на тест-сервере.
 
 > Сделано в этот заход (промокоды, косметика, стримеры):
 >

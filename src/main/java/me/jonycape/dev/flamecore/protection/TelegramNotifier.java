@@ -140,6 +140,14 @@ public final class TelegramNotifier {
         sendMessage(tgText(ConfigKeys.TG_DANGER_EXECUTED, "player", esc(playerName), "command", esc(command)), null);
     }
 
+    public void sendKickNonAdmin(String playerName, String ip) {
+        if (!available) {
+            return;
+        }
+        sendMessage(tgText(ConfigKeys.TG_KICK_NON_ADMIN, "player", esc(playerName), "ip", esc(ip),
+                "time", TIME_FORMAT.format(new Date())), null);
+    }
+
     private static InlineKeyboardButton allowButton(String name) {
         return new InlineKeyboardButton("✅ Впустить").callbackData("allow " + name);
     }

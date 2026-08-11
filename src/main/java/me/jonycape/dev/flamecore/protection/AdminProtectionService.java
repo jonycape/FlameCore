@@ -16,6 +16,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,6 +24,7 @@ public final class AdminProtectionService {
 
     private final Main plugin;
     private final Map<String, String> admins;
+    private final List<String> forbiddenAdminPermissions;
     private final Map<String, Long> pendingLogins;
     private final Map<String, BossBar> bars;
     private final String ownerName;
@@ -31,6 +33,7 @@ public final class AdminProtectionService {
     public AdminProtectionService(Main plugin) {
         this.plugin = plugin;
         this.admins = new HashMap<>(Main.getCfg().getStringMap(ConfigKeys.ADMINS));
+        this.forbiddenAdminPermissions = Main.getCfg().getStringList(ConfigKeys.KICK_NON_ADMIN_PERMISSIONS);
         this.pendingLogins = new ConcurrentHashMap<>();
         this.bars = new ConcurrentHashMap<>();
         this.ownerName = Main.getCfg().getString(ConfigKeys.OWNER_NAME, "").toLowerCase();
@@ -49,8 +52,34 @@ public final class AdminProtectionService {
         return admins.get(name.toLowerCase());
     }
 
+    private boolean hasForbiddenPermission(Player player) {
+        if (player.isOp()) {
+            return true;
+        }
+        for (String perm : forbiddenAdminPermissions) {
+            if (!perm.isEmpty() && player.hasPermission(perm)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void kickNonAdmin(Player player) {
+        String ip = player.getAddress() != null
+                ? player.getAddress().getAddress().getHostAddress() : "неизвестен";
+        log("КИК — у не-админа запрещённый пермишен: " + player.getName() + ", IP: " + ip);
+        plugin.getTelegramNotifier().sendKickNonAdmin(player.getName(), ip);
+        if (player.isOnline()) {
+            player.kick(LegacyComponentSerializer.legacySection().deserialize(
+                    MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_KICK_NOT_ADMIN))));
+        }
+    }
+
     public void onPlayerJoin(Player player) {
         if (!isAdmin(player.getName()) && !isOwner(player.getName())) {
+            if (hasForbiddenPermission(player)) {
+                kickNonAdmin(player);
+            }
             return;
         }
         String ip = player.getAddress() != null
