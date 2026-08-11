@@ -40,6 +40,8 @@ public final class CustomizeService {
     private final Map<String, ChatColor> colorNames = new HashMap<>();
     private final Map<String, String> rawNames = new HashMap<>();
 
+    private Scoreboard glowBoard;
+
     private int rainbowIndex;
     private int glowCounter;
     private int nimbCounter;
@@ -73,6 +75,7 @@ public final class CustomizeService {
 
     public void start() {
         loadColors();
+        glowBoard = Bukkit.getScoreboardManager().getNewScoreboard();
         int tick = ConfigManager.getInstance().getInt("customize.task-interval", 2);
         tick = Math.max(1, Math.min(tick, 20));
         taskId = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, tick, tick).getTaskId();
@@ -123,6 +126,7 @@ public final class CustomizeService {
             state.setRainbow(false);
             removeFromColorTeams(player);
             player.removePotionEffect(PotionEffectType.GLOWING);
+            restoreScoreboard(player);
             player.sendMessage(MessageUtils.color(
                     Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET)
                             .replace("%color%", "&7выключено")));
@@ -158,10 +162,9 @@ public final class CustomizeService {
         boolean enable = !state.isParrot();
         state.setParrot(enable);
         if (enable) {
-            Parrot current = parrots.get(id);
-            if (current != null && current.isValid()) {
-                player.setShoulderEntityLeft(current);
-            } else {
+            Parrot parrot = parrots.get(id);
+            if (parrot == null || !parrot.isValid()) {
+                clearShoulder(player);
                 parrots.put(id, spawnParrot(player));
             }
             player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_PARROT_ON)));
@@ -238,33 +241,42 @@ public final class CustomizeService {
 
     private void parrotTick(Player player) {
         UUID id = player.getUniqueId();
-        org.bukkit.entity.Entity shoulder = player.getShoulderEntityLeft();
-        if (shoulder instanceof Parrot) {
-            shoulder.setInvulnerable(true);
-            return;
+        clearShoulder(player);
+        Parrot parrot = parrots.get(id);
+        if (parrot == null || !parrot.isValid()) {
+            Parrot old = parrots.remove(id);
+            if (old != null && old.isValid()) {
+                old.remove();
+            }
+            parrot = spawnParrot(player);
+            parrots.put(id, parrot);
         }
-        Parrot old = parrots.remove(id);
-        if (old != null && old.isValid()) {
-            old.remove();
-        }
-        if (shoulder != null) {
-            player.setShoulderEntityLeft(null);
-        }
-        parrots.put(id, spawnParrot(player));
+        teleportToShoulder(player, parrot);
     }
 
     private Parrot spawnParrot(Player player) {
+        clearShoulder(player);
         Parrot parrot = (Parrot) player.getWorld().spawnEntity(player.getLocation(), org.bukkit.entity.EntityType.PARROT);
         parrot.setVariant(PARROT_VARIANT);
         parrot.setInvulnerable(true);
         parrot.setSilent(true);
         parrot.setAI(false);
         parrot.setGravity(false);
-        player.setShoulderEntityLeft(parrot);
-        if (parrot.isValid()) {
-            parrot.remove();
-        }
         return parrot;
+    }
+
+    private void teleportToShoulder(Player player, Parrot parrot) {
+        double yawRad = Math.toRadians(player.getEyeLocation().getYaw());
+        double fwdX = -Math.sin(yawRad);
+        double fwdZ = Math.cos(yawRad);
+        double leftX = Math.cos(yawRad);
+        double leftZ = Math.sin(yawRad);
+        Location target = player.getEyeLocation().clone()
+                .add(fwdX * 0.25 - leftX * 0.32, -0.52, fwdZ * 0.25 - leftZ * 0.32);
+        target.setYaw(player.getEyeLocation().getYaw());
+        target.setPitch(0);
+        parrot.teleport(target);
+        parrot.setVelocity(parrot.getVelocity().multiply(0.0));
     }
 
     private void clearShoulder(Player player) {
@@ -303,7 +315,7 @@ public final class CustomizeService {
         if (color == null) {
             return;
         }
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Scoreboard board = glowBoard;
         player.setScoreboard(board);
         Team team = getTeam(color);
         if (team != null) {
@@ -317,7 +329,7 @@ public final class CustomizeService {
             player.addPotionEffect(new PotionEffect(
                     PotionEffectType.GLOWING, GLOW_DURATION, 0, false, false, false));
         }
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Scoreboard board = glowBoard;
         player.setScoreboard(board);
         Team team = getTeam(color);
         if (team != null) {
@@ -327,7 +339,7 @@ public final class CustomizeService {
     }
 
     private Team getTeam(ChatColor color) {
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Scoreboard board = glowBoard;
         String name = "flamecore_" + color.getChar();
         Team team = board.getTeam(name);
         if (team == null) {
@@ -340,13 +352,13 @@ public final class CustomizeService {
     }
 
     private boolean isOnColorTeam(Player player) {
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Scoreboard board = glowBoard;
         Team team = board.getEntryTeam(player.getName());
         return team != null && team.getName().startsWith("flamecore_");
     }
 
     private void removeFromColorTeams(Player player) {
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Scoreboard board = glowBoard;
         Team team = board.getEntryTeam(player.getName());
         if (team != null && team.getName().startsWith("flamecore_")) {
             team.removeEntry(player.getName());
@@ -355,6 +367,11 @@ public final class CustomizeService {
 
     private void removeFromAllTeams(Player player) {
         removeFromColorTeams(player);
+        restoreScoreboard(player);
+    }
+
+    private void restoreScoreboard(Player player) {
+        player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
     }
 
     private ChatColor nextRainbow() {
