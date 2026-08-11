@@ -12,6 +12,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.FireworkEffect;
 import org.bukkit.Location;
+import org.bukkit.command.CommandMap;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
@@ -27,6 +28,7 @@ public final class PromoCodeService {
     private final Main plugin;
     private final PromoCodeDAO dao;
     private final Map<String, PromoCode> codes;
+    private CommandMap commandMap;
 
     @Getter
     private final Map<String, PromoCode> loadedCodes;
@@ -61,7 +63,15 @@ public final class PromoCodeService {
             List<Color> fade = parseColors(entry, "fade", new String[]{"ffdd55", "7a0000"});
             codes.put(codeName.toLowerCase(),
                     new PromoCode(codeName, uses, commands, colors, fade));
+            registerCommand(codeName.toLowerCase());
         }
+    }
+
+    private void registerCommand(String name) {
+        if (commandMap == null) {
+            commandMap = plugin.getServer().getCommandMap();
+        }
+        commandMap.register("flamecore", new PromoCodeCommand(name));
     }
 
     public PromoCode getCode(String name) {

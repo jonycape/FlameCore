@@ -16,6 +16,10 @@ commands:
   flamecore:
     description: Главная команда плагина FlameCore
     aliases: [fc]
+  stream:
+    description: Анонс стрима на весь сервер
+    usage: /stream <ссылка>
+    permission: flamecore.stream
 
 permissions:
   flamecore.admin:

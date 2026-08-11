@@ -124,8 +124,8 @@ public final class CustomizeService {
             removeFromColorTeams(player);
             player.removePotionEffect(PotionEffectType.GLOWING);
             player.sendMessage(MessageUtils.color(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET))
-                    .replace("%color%", "&7выключено"));
+                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET)
+                            .replace("%color%", "&7выключено")));
             return;
         }
         if (key.equals("rainbow")) {
@@ -133,8 +133,8 @@ public final class CustomizeService {
             state.setGlowColor(null);
             applyRainbow(player, nextRainbow());
             player.sendMessage(MessageUtils.color(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET))
-                    .replace("%color%", "&d🌈 Радужный"));
+                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET)
+                            .replace("%color%", "&d🌈 Радужный")));
             return;
         }
         ChatColor color = colorNames.get(key);
@@ -148,8 +148,8 @@ public final class CustomizeService {
         state.setGlowColor(color);
         applyGlow(player);
         player.sendMessage(MessageUtils.color(
-                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET))
-                .replace("%color%", rawNames.getOrDefault(key, "&f" + key)));
+                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET)
+                        .replace("%color%", rawNames.getOrDefault(key, "&f" + key))));
     }
 
     public void toggleParrot(Player player) {
@@ -238,22 +238,19 @@ public final class CustomizeService {
 
     private void parrotTick(Player player) {
         UUID id = player.getUniqueId();
-        Parrot parrot = parrots.get(id);
-        if (parrot != null && (!parrot.isValid() || parrot.isDead())) {
-            parrots.remove(id);
-            if (parrot.isValid()) {
-                parrot.remove();
-            }
-            parrot = null;
-        }
-        if (parrot == null || !parrot.isValid()) {
-            parrots.put(id, spawnParrot(player));
+        org.bukkit.entity.Entity shoulder = player.getShoulderEntityLeft();
+        if (shoulder instanceof Parrot) {
+            shoulder.setInvulnerable(true);
             return;
         }
-        parrot.setInvulnerable(true);
-        if (player.getShoulderEntityLeft() != parrot) {
-            player.setShoulderEntityLeft(parrot);
+        Parrot old = parrots.remove(id);
+        if (old != null && old.isValid()) {
+            old.remove();
         }
+        if (shoulder != null) {
+            player.setShoulderEntityLeft(null);
+        }
+        parrots.put(id, spawnParrot(player));
     }
 
     private Parrot spawnParrot(Player player) {
@@ -264,6 +261,9 @@ public final class CustomizeService {
         parrot.setAI(false);
         parrot.setGravity(false);
         player.setShoulderEntityLeft(parrot);
+        if (parrot.isValid()) {
+            parrot.remove();
+        }
         return parrot;
     }
 
@@ -303,6 +303,8 @@ public final class CustomizeService {
         if (color == null) {
             return;
         }
+        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        player.setScoreboard(board);
         Team team = getTeam(color);
         if (team != null) {
             removeFromColorTeams(player);
@@ -315,6 +317,8 @@ public final class CustomizeService {
             player.addPotionEffect(new PotionEffect(
                     PotionEffectType.GLOWING, GLOW_DURATION, 0, false, false, false));
         }
+        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        player.setScoreboard(board);
         Team team = getTeam(color);
         if (team != null) {
             removeFromColorTeams(player);

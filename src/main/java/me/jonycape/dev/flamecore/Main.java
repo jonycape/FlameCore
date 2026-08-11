@@ -3,6 +3,7 @@ package me.jonycape.dev.flamecore;
 import lombok.Getter;
 import me.jonycape.dev.flamecore.commands.FlameCoreCommand;
 import me.jonycape.dev.flamecore.commands.GiveawayCommandExecutor;
+import me.jonycape.dev.flamecore.commands.StreamCommandExecutor;
 import me.jonycape.dev.flamecore.config.ConfigManager;
 import me.jonycape.dev.flamecore.database.DatabaseManager;
 import me.jonycape.dev.flamecore.giveaway.GiveawayManager;
@@ -129,6 +130,7 @@ public final class Main extends JavaPlugin {
         FlameCoreCommand flameCore = new FlameCoreCommand(this);
         getCommand("flamecore").setExecutor(flameCore);
         getCommand("flamecore").setTabCompleter(flameCore);
+        getCommand("stream").setExecutor(new StreamCommandExecutor(this));
     }
 
     private void initProtection() {
