@@ -262,6 +262,27 @@ src/main/java/me/jonycape/dev/flamecore/
 - Вызов происходит на входе (HIGHEST), игрок ещё online → `kick()` работает.
 - Пермишены в конфиге: `*`, `minecraft/bukkit.command.op`, `luckperms.*`, `group.admin` (пример, поправимо под нужды).
 
+### 3.11 Главный фикс зависания сервера — Telegram АСИНКРОННЫЙ
+
+**Где:** `TelegramNotifier`.
+
+**Баг:** при входе админа/владельца `onPlayerJoin` (main-поток) звал `sendOwnerLogin`
+→ `sendMessageTo` → `bot.execute(...)` — **синхронный блокирующий HTTP-запрос**. Если Telegram
+недоступен (нет интернета/неверный токен), `Socket.connect` к `api.telegram.org` блокировал
+**главный поток сервера** на 10–15+ сек (хартбит: «The server has not responded for N seconds»),
+т.е. весь сервер «замерзал» при входе админа.
+
+**Фикс:**
+1. ВСЕ отправки в Telegram (`sendMessageTo`, `answerCallback`, `removeKeyboard`, `editKeyboard`)
+   обёрнуты в `executeAsync()` = `Bukkit.getScheduler().runTaskAsynchronously(plugin, …)` —
+   HTTP больше никогда не выполняется на главном потоке.
+2. `available = !token.isEmpty() && !token.contains("ВАШ")` — токен-заглушка
+   `ВАШ_ТОКЕН_БОТА` теперь считается НЕдоступным: нет прослушивания `getUpdates` (нет спама 404)
+   и нет пустых попыток connect при каждом входе.
+
+> **ПРАВИЛО:** Telegram I/O (и вообще любой сетевой вызов) — только асинхронно/на фоне,
+> никогда не в main-потоке (`runTask` для Bukkit-реакций, `runTaskAsynchronously` для HTTP).
+
 ---
 
 ## 4. Что доделать ЗАВТРА (TODO)

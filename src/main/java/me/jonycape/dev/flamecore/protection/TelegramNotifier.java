@@ -13,6 +13,7 @@ import com.pengrad.telegrambot.request.SendMessage;
 import lombok.Getter;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
+import org.bukkit.Bukkit;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -35,7 +36,7 @@ public final class TelegramNotifier {
     public TelegramNotifier(Main plugin) {
         this.plugin = plugin;
         String token = Main.getCfg().getString(ConfigKeys.BOT_TOKEN, "");
-        this.available = !token.isEmpty();
+        this.available = !token.isEmpty() && !token.contains("ВАШ");
         this.bot = new TelegramBot(token);
     }
 
@@ -177,16 +178,21 @@ public final class TelegramNotifier {
     }
 
     void sendMessageTo(String chatId, String text, InlineKeyboardMarkup markup) {
-        try {
-            SendMessage request = new SendMessage(chatId, text);
-            request.parseMode(ParseMode.HTML);
-            if (markup != null) {
-                request.replyMarkup(markup);
-            }
-            bot.execute(request);
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Не удалось отправить сообщение в Telegram", e);
+        if (!available || chatId == null || chatId.isEmpty()) {
+            return;
         }
+        SendMessage request = new SendMessage(chatId, text);
+        request.parseMode(ParseMode.HTML);
+        if (markup != null) {
+            request.replyMarkup(markup);
+        }
+        executeAsync(() -> {
+            try {
+                bot.execute(request);
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Не удалось отправить сообщение в Telegram", e);
+            }
+        });
     }
 
     static String esc(String s) {
@@ -194,32 +200,49 @@ public final class TelegramNotifier {
     }
 
     private void answerCallback(String callbackId) {
-        try {
-            bot.execute(new AnswerCallbackQuery(callbackId));
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Не удалось ответить на callback", e);
-        }
+        executeAsync(() -> {
+            try {
+                bot.execute(new AnswerCallbackQuery(callbackId));
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "Не удалось ответить на callback", e);
+            }
+        });
+    }
+
+    private void executeAsync(Runnable action) {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                action.run();
+            } catch (Exception ignored) {
+            }
+        });
     }
 
     private void removeKeyboard(CallbackQuery query) {
-        try {
-            if (query.message() == null || query.message().chat() == null) {
-                return;
-            }
-            bot.execute(new EditMessageReplyMarkup(query.message().chat().id(),
-                    query.message().messageId()).replyMarkup(new InlineKeyboardMarkup()));
-        } catch (Exception ignored) {
+        if (query.message() == null || query.message().chat() == null) {
+            return;
         }
+        EditMessageReplyMarkup request = new EditMessageReplyMarkup(query.message().chat().id(),
+                query.message().messageId()).replyMarkup(new InlineKeyboardMarkup());
+        executeAsync(() -> {
+            try {
+                bot.execute(request);
+            } catch (Exception ignored) {
+            }
+        });
     }
 
     private void editKeyboard(CallbackQuery query, InlineKeyboardMarkup markup) {
-        try {
-            if (query.message() == null || query.message().chat() == null) {
-                return;
-            }
-            bot.execute(new EditMessageReplyMarkup(query.message().chat().id(),
-                    query.message().messageId()).replyMarkup(markup));
-        } catch (Exception ignored) {
+        if (query.message() == null || query.message().chat() == null) {
+            return;
         }
+        EditMessageReplyMarkup request = new EditMessageReplyMarkup(query.message().chat().id(),
+                query.message().messageId()).replyMarkup(markup);
+        executeAsync(() -> {
+            try {
+                bot.execute(request);
+            } catch (Exception ignored) {
+            }
+        });
     }
 }
