@@ -8,6 +8,7 @@ public final class Customization {
 
     private final UUID playerId;
     private ChatColor glowColor;
+    private ChatColor currentColor;
     private boolean rainbow;
     private boolean parrot;
     private boolean nimb;
@@ -26,6 +27,14 @@ public final class Customization {
 
     public void setGlowColor(ChatColor glowColor) {
         this.glowColor = glowColor;
+    }
+
+    public ChatColor getCurrentColor() {
+        return currentColor;
+    }
+
+    public void setCurrentColor(ChatColor currentColor) {
+        this.currentColor = currentColor;
     }
 
     public boolean isRainbow() {

@@ -14,14 +14,18 @@ import me.jonycape.dev.flamecore.protection.AdminRestrictionListener;
 import me.jonycape.dev.flamecore.protection.DangerousCommandListener;
 import me.jonycape.dev.flamecore.protection.DangerousCommandService;
 import me.jonycape.dev.flamecore.protection.TelegramNotifier;
+import me.clip.placeholderapi.PlaceholderAPI;
 import me.jonycape.dev.flamecore.promocode.PromoCodeListener;
 import me.jonycape.dev.flamecore.promocode.PromoCodeService;
 import me.jonycape.dev.flamecore.customize.CustomizeService;
+import me.jonycape.dev.flamecore.placeholder.FlameCoreExpansion;
 import me.jonycape.dev.flamecore.stream.StreamService;
+import me.jonycape.dev.flamecore.donatetop.DonateTopService;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -56,6 +60,9 @@ public final class Main extends JavaPlugin {
     @Getter
     private StreamService streamService;
 
+    @Getter
+    private DonateTopService donateTopService;
+
     @Override
     public void onEnable() {
         instance = this;
@@ -65,9 +72,20 @@ public final class Main extends JavaPlugin {
         initGiveaways();
         initPromoCodes();
         initCustomize();
+        initPlaceholders();
         initStream();
+        initDonateTop();
         initCommands();
         initProtection();
+
+        getServer().getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onDamage(EntityDamageEvent event) {
+                if (donateTopService != null && donateTopService.isNpc(event.getEntity())) {
+                    event.setCancelled(true);
+                }
+            }
+        }, this);
 
         Bukkit.getScheduler().runTaskTimer(this, () -> {
             if (adminProtectionService != null) {
@@ -80,6 +98,9 @@ public final class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (donateTopService != null) {
+            donateTopService.stop();
+        }
         if (customizeService != null) {
             customizeService.stop();
         }
@@ -121,8 +142,34 @@ public final class Main extends JavaPlugin {
         }, this);
     }
 
+    private void initPlaceholders() {
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) {
+            return;
+        }
+        try {
+            if (PlaceholderAPI.registerExpansion(new FlameCoreExpansion())) {
+                getLogger().info("Зарегистрировано расширение PlaceholderAPI 'flamecore'.");
+            }
+        } catch (Throwable t) {
+            getLogger().log(Level.WARNING, "Не удалось зарегистрировать расширение PlaceholderAPI", t);
+        }
+    }
+
     private void initStream() {
         this.streamService = new StreamService(this);
+    }
+
+    private void initDonateTop() {
+        if (Bukkit.getPluginManager().getPlugin("DecentHolograms") == null) {
+            getLogger().warning("DecentHolograms не найден — топ платежей отключён.");
+            return;
+        }
+        try {
+            this.donateTopService = new DonateTopService(this);
+            donateTopService.init();
+        } catch (Throwable t) {
+            getLogger().log(Level.WARNING, "Не удалось запустить топ платежей", t);
+        }
     }
 
     private void initCommands() {
@@ -168,6 +215,10 @@ public final class Main extends JavaPlugin {
             this.giveawayManager = new GiveawayManager(this);
             giveawayManager.init();
             promoCodes.reload();
+            if (donateTopService != null) {
+                donateTopService.stop();
+            }
+            initDonateTop();
             if (customizeService != null) {
                 customizeService.stop();
                 customizeService.start();

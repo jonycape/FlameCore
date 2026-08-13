@@ -5,11 +5,13 @@ import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.management.ServerManagementService;
 import me.jonycape.dev.flamecore.management.SessionManager;
 import me.jonycape.dev.flamecore.customize.CustomizeService;
+import me.jonycape.dev.flamecore.donatetop.DonateTopService;
 import me.jonycape.dev.flamecore.utils.MessageUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
@@ -20,7 +22,7 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
 
     private static final List<String> SUBCOMMANDS = List.of(
             "tps", "mspt", "system", "online", "worlds", "announce", "player", "check", "reload",
-            "customize", "stream");
+            "customize", "stream", "addpayment", "paymenttop");
 
     private final ServerManagementService management;
 
@@ -37,6 +39,12 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
         }
 
         String sub = args[0].toLowerCase();
+        if (sub.equals("addpayment")) {
+            return handleAddPayment(sender, args);
+        }
+        if (sub.equals("paymenttop")) {
+            return handlePaymentTop(sender, args);
+        }
         if (!(sender instanceof Player player)) {
             return handleConsole(sender, sub);
         }
@@ -101,6 +109,62 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
         }
         plugin.getStreamService().announce(player, args[1]);
         return true;
+    }
+
+    private boolean handleAddPayment(CommandSender sender, String[] args) {
+        if (!(sender instanceof ConsoleCommandSender) && !sender.hasPermission(ConfigKeys.PERM_ADMIN)) {
+            sendMessage(sender, ConfigKeys.MESSAGE_NO_PERMISSION);
+            return true;
+        }
+        if (args.length < 2 || args[1].isEmpty()) {
+            sender.sendMessage("FlameCore: использование /flamecore addpayment <ник>");
+            return true;
+        }
+        DonateTopService service = plugin.getDonateTopService();
+        if (service == null) {
+            sender.sendMessage("FlameCore: топ платежей отключён (нет DecentHolograms).");
+            return true;
+        }
+        service.addPayment(args[1]);
+        sender.sendMessage("FlameCore: платёж для " + args[1] + " учтён.");
+        return true;
+    }
+
+    private boolean handlePaymentTop(CommandSender sender, String[] args) {
+        if (!(sender instanceof ConsoleCommandSender) && !sender.hasPermission(ConfigKeys.PERM_ADMIN)) {
+            sendMessage(sender, ConfigKeys.MESSAGE_NO_PERMISSION);
+            return true;
+        }
+        if (args.length < 2) {
+            sendMessage(sender, ConfigKeys.MESSAGE_DONATETOP_USAGE);
+            return true;
+        }
+        DonateTopService service = plugin.getDonateTopService();
+        if (service == null) {
+            sender.sendMessage("FlameCore: топ платежей отключён (нет DecentHolograms).");
+            return true;
+        }
+        switch (args[1].toLowerCase()) {
+            case "spawn":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("FlameCore: спавн доступен только игроку.");
+                    return true;
+                }
+                service.spawnAt(player.getLocation());
+                sendMessage(sender, ConfigKeys.MESSAGE_DONATETOP_SPAWNED);
+                return true;
+            case "remove":
+                service.remove();
+                sendMessage(sender, ConfigKeys.MESSAGE_DONATETOP_REMOVED);
+                return true;
+            case "clear":
+                service.clearTop();
+                sendMessage(sender, ConfigKeys.MESSAGE_DONATETOP_CLEARED);
+                return true;
+            default:
+                sendMessage(sender, ConfigKeys.MESSAGE_DONATETOP_USAGE);
+                return true;
+        }
     }
 
     private boolean handleSubcommand(CommandSender sender, String sub, String[] args) {
@@ -215,6 +279,20 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
                     if (color.startsWith(prefix)) {
                         completions.add(color);
                     }
+                }
+            }
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("paymenttop")) {
+            String prefix = args[1].toLowerCase();
+            for (String opt : List.of("spawn", "remove", "clear")) {
+                if (opt.startsWith(prefix)) {
+                    completions.add(opt);
+                }
+            }
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("addpayment")) {
+            String prefix = args[1].toLowerCase();
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                if (online.getName().toLowerCase().startsWith(prefix)) {
+                    completions.add(online.getName());
                 }
             }
         }

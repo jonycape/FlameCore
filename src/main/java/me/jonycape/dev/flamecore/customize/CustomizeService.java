@@ -3,7 +3,7 @@ package me.jonycape.dev.flamecore.customize;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.config.ConfigManager;
-import me.jonycape.dev.flamecore.utils.MessageUtils;
+import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -36,11 +36,8 @@ public final class CustomizeService {
 
     private final Main plugin;
     private final Map<UUID, Customization> active = new HashMap<>();
-    private final Map<UUID, Parrot> parrots = new HashMap<>();
     private final Map<String, ChatColor> colorNames = new HashMap<>();
     private final Map<String, String> rawNames = new HashMap<>();
-
-    private Scoreboard glowBoard;
 
     private int rainbowIndex;
     private int glowCounter;
@@ -62,20 +59,19 @@ public final class CustomizeService {
         colorNames.put("pink", ChatColor.LIGHT_PURPLE);
         colorNames.put("white", ChatColor.WHITE);
 
-        rawNames.put("red", "&cКрасный");
-        rawNames.put("orange", "&6Оранжевый");
-        rawNames.put("yellow", "&eЖёлтый");
-        rawNames.put("green", "&aЗелёный");
-        rawNames.put("cyan", "&bГолубой");
-        rawNames.put("blue", "&9Синий");
-        rawNames.put("purple", "&5Фиолетовый");
-        rawNames.put("pink", "&dРозовый");
-        rawNames.put("white", "&fБелый");
+        rawNames.put("red", "&#FF5555Красный");
+        rawNames.put("orange", "&#FFAA00Оранжевый");
+        rawNames.put("yellow", "&#FFFF55Жёлтый");
+        rawNames.put("green", "&#55FF55Зелёный");
+        rawNames.put("cyan", "&#55FFFFГолубой");
+        rawNames.put("blue", "&#5555FFСиний");
+        rawNames.put("purple", "&#AA00AAФиолетовый");
+        rawNames.put("pink", "&#FF55FFРозовый");
+        rawNames.put("white", "&#FFFFFFБелый");
     }
 
     public void start() {
         loadColors();
-        glowBoard = Bukkit.getScoreboardManager().getNewScoreboard();
         int tick = ConfigManager.getInstance().getInt("customize.task-interval", 2);
         tick = Math.max(1, Math.min(tick, 20));
         taskId = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, tick, tick).getTaskId();
@@ -86,35 +82,33 @@ public final class CustomizeService {
             Bukkit.getScheduler().cancelTask(taskId);
             taskId = -1;
         }
-        for (Parrot parrot : parrots.values()) {
-            if (parrot != null && parrot.isValid()) {
-                parrot.remove();
-            }
-        }
-        parrots.clear();
         for (Customization customization : active.values()) {
             Player player = Bukkit.getPlayer(customization.getPlayerId());
-            if (player != null) {
-                removeFromAllTeams(player);
-                player.removePotionEffect(PotionEffectType.GLOWING);
+            if (player == null) {
+                continue;
             }
+            if (customization.isParrot()) {
+                clearShoulder(player);
+            }
+            removeFromAllTeams(player);
+            player.removePotionEffect(PotionEffectType.GLOWING);
         }
         active.clear();
     }
 
     public void onQuit(Player player) {
         UUID id = player.getUniqueId();
+        Customization state = active.get(id);
+        if (state != null && state.isParrot()) {
+            clearShoulder(player);
+        }
         removeFromAllTeams(player);
         player.removePotionEffect(PotionEffectType.GLOWING);
-        Parrot parrot = parrots.remove(id);
-        if (parrot != null && parrot.isValid()) {
-            parrot.remove();
-        }
         active.remove(id);
     }
 
     public void menu(Player player) {
-        player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_MENU)));
+        MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_MENU));
     }
 
     public void setColor(Player player, String name) {
@@ -123,37 +117,35 @@ public final class CustomizeService {
 
         if (key.equals("off")) {
             state.setGlowColor(null);
+            state.setCurrentColor(null);
             state.setRainbow(false);
             removeFromColorTeams(player);
             player.removePotionEffect(PotionEffectType.GLOWING);
-            restoreScoreboard(player);
-            player.sendMessage(MessageUtils.color(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET)
-                            .replace("%color%", "&7выключено")));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET),
+                    "color", "&7выключено");
             return;
         }
         if (key.equals("rainbow")) {
             state.setRainbow(true);
             state.setGlowColor(null);
+            state.setCurrentColor(null);
             applyRainbow(player, nextRainbow());
-            player.sendMessage(MessageUtils.color(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET)
-                            .replace("%color%", "&d🌈 Радужный")));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET),
+                    "color", "&d🌈 Радужный");
             return;
         }
         ChatColor color = colorNames.get(key);
         if (color == null) {
-            player.sendMessage(MessageUtils.color(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_INVALID_COLOR)
-                            .replace("%color%", name)));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_INVALID_COLOR),
+                    "color", name);
             return;
         }
         state.setRainbow(false);
         state.setGlowColor(color);
+        state.setCurrentColor(color);
         applyGlow(player);
-        player.sendMessage(MessageUtils.color(
-                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET)
-                        .replace("%color%", rawNames.getOrDefault(key, "&f" + key))));
+        MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_COLOR_SET),
+                "color", rawNames.getOrDefault(key, "&f" + key));
     }
 
     public void toggleParrot(Player player) {
@@ -162,19 +154,11 @@ public final class CustomizeService {
         boolean enable = !state.isParrot();
         state.setParrot(enable);
         if (enable) {
-            Parrot parrot = parrots.get(id);
-            if (parrot == null || !parrot.isValid()) {
-                clearShoulder(player);
-                parrots.put(id, spawnParrot(player));
-            }
-            player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_PARROT_ON)));
+            mountShoulderParrot(player);
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_PARROT_ON));
         } else {
-            Parrot parrot = parrots.remove(id);
             clearShoulder(player);
-            if (parrot != null && parrot.isValid()) {
-                parrot.remove();
-            }
-            player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_PARROT_OFF)));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_PARROT_OFF));
         }
     }
 
@@ -184,9 +168,9 @@ public final class CustomizeService {
         boolean enable = !state.isNimb();
         state.setNimb(enable);
         if (enable) {
-            player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_NIMB_ON)));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_NIMB_ON));
         } else {
-            player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_CUSTOMIZE_NIMB_OFF)));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_NIMB_OFF));
         }
     }
 
@@ -199,7 +183,7 @@ public final class CustomizeService {
     }
 
     private void tick() {
-        if (active.isEmpty() && parrots.isEmpty()) {
+        if (active.isEmpty()) {
             return;
         }
         int taskTick = Math.max(1, ConfigManager.getInstance().getInt("customize.task-interval", 2));
@@ -213,9 +197,6 @@ public final class CustomizeService {
             Player player = Bukkit.getPlayer(state.getPlayerId());
             if (player == null || !player.isOnline() || player.getWorld() == null) {
                 continue;
-            }
-            if (state.isParrot()) {
-                parrotTick(player);
             }
             if (state.isNimb() && nimbTick) {
                 spawnNimb(player, nimbCount, nimbRadius);
@@ -240,50 +221,23 @@ public final class CustomizeService {
     }
 
     private void parrotTick(Player player) {
-        UUID id = player.getUniqueId();
-        clearShoulder(player);
-        Parrot parrot = parrots.get(id);
-        if (parrot == null || !parrot.isValid()) {
-            Parrot old = parrots.remove(id);
-            if (old != null && old.isValid()) {
-                old.remove();
-            }
-            parrot = spawnParrot(player);
-            parrots.put(id, parrot);
+        if (player.getShoulderEntityLeft() == null) {
+            mountShoulderParrot(player);
         }
-        teleportToShoulder(player, parrot);
     }
 
-    private Parrot spawnParrot(Player player) {
-        clearShoulder(player);
-        Parrot parrot = (Parrot) player.getWorld().spawnEntity(player.getLocation(), org.bukkit.entity.EntityType.PARROT);
+    private void mountShoulderParrot(Player player) {
+        Parrot parrot = (Parrot) player.getWorld().spawnEntity(
+                player.getLocation(), org.bukkit.entity.EntityType.PARROT);
         parrot.setVariant(PARROT_VARIANT);
         parrot.setInvulnerable(true);
         parrot.setSilent(true);
-        parrot.setAI(false);
-        parrot.setGravity(false);
-        return parrot;
-    }
-
-    private void teleportToShoulder(Player player, Parrot parrot) {
-        double yawRad = Math.toRadians(player.getEyeLocation().getYaw());
-        double fwdX = -Math.sin(yawRad);
-        double fwdZ = Math.cos(yawRad);
-        double leftX = Math.cos(yawRad);
-        double leftZ = Math.sin(yawRad);
-        Location target = player.getEyeLocation().clone()
-                .add(fwdX * 0.25 - leftX * 0.32, -0.52, fwdZ * 0.25 - leftZ * 0.32);
-        target.setYaw(player.getEyeLocation().getYaw());
-        target.setPitch(0);
-        parrot.teleport(target);
-        parrot.setVelocity(parrot.getVelocity().multiply(0.0));
+        player.setShoulderEntityLeft(parrot);
+        parrot.remove();
     }
 
     private void clearShoulder(Player player) {
-        org.bukkit.entity.Entity left = player.getShoulderEntityLeft();
-        if (left != null) {
-            player.setShoulderEntityLeft(null);
-        }
+        player.setShoulderEntityLeft(null);
     }
 
     private void spawnNimb(Player player, int count, double radius) {
@@ -315,31 +269,36 @@ public final class CustomizeService {
         if (color == null) {
             return;
         }
-        Scoreboard board = glowBoard;
-        player.setScoreboard(board);
-        Team team = getTeam(color);
-        if (team != null) {
-            removeFromColorTeams(player);
-            team.addEntry(player.getName());
-        }
+        applyColorTeam(player, color);
     }
 
     private void applyRainbow(Player player, ChatColor color) {
+        Customization state = active.get(player.getUniqueId());
+        if (state != null) {
+            state.setCurrentColor(color);
+        }
         if (!player.hasPotionEffect(PotionEffectType.GLOWING)) {
             player.addPotionEffect(new PotionEffect(
                     PotionEffectType.GLOWING, GLOW_DURATION, 0, false, false, false));
         }
-        Scoreboard board = glowBoard;
-        player.setScoreboard(board);
-        Team team = getTeam(color);
+        applyColorTeam(player, color);
+    }
+
+    public ChatColor currentColor(Player player) {
+        Customization state = active.get(player.getUniqueId());
+        return state == null ? null : state.getCurrentColor();
+    }
+
+    private void applyColorTeam(Player player, ChatColor color) {
+        Scoreboard board = activeBoard(player);
+        Team team = getTeam(board, color);
         if (team != null) {
             removeFromColorTeams(player);
             team.addEntry(player.getName());
         }
     }
 
-    private Team getTeam(ChatColor color) {
-        Scoreboard board = glowBoard;
+    private Team getTeam(Scoreboard board, ChatColor color) {
         String name = "flamecore_" + color.getChar();
         Team team = board.getTeam(name);
         if (team == null) {
@@ -352,26 +311,26 @@ public final class CustomizeService {
     }
 
     private boolean isOnColorTeam(Player player) {
-        Scoreboard board = glowBoard;
+        Scoreboard board = activeBoard(player);
         Team team = board.getEntryTeam(player.getName());
         return team != null && team.getName().startsWith("flamecore_");
     }
 
     private void removeFromColorTeams(Player player) {
-        Scoreboard board = glowBoard;
+        Scoreboard board = activeBoard(player);
         Team team = board.getEntryTeam(player.getName());
         if (team != null && team.getName().startsWith("flamecore_")) {
             team.removeEntry(player.getName());
         }
     }
 
-    private void removeFromAllTeams(Player player) {
-        removeFromColorTeams(player);
-        restoreScoreboard(player);
+    private Scoreboard activeBoard(Player player) {
+        Scoreboard board = player.getScoreboard();
+        return board == null ? Bukkit.getScoreboardManager().getMainScoreboard() : board;
     }
 
-    private void restoreScoreboard(Player player) {
-        player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+    private void removeFromAllTeams(Player player) {
+        removeFromColorTeams(player);
     }
 
     private ChatColor nextRainbow() {

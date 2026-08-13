@@ -2,7 +2,7 @@ package me.jonycape.dev.flamecore.promocode;
 
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
-import me.jonycape.dev.flamecore.utils.MessageUtils;
+import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -38,9 +38,8 @@ public final class PromoCodeListener implements Listener {
         Player player = event.getPlayer();
         PromoCodeService.Result result = service.consume(player, name);
         if (result == PromoCodeService.Result.NOT_FOUND) {
-            player.sendMessage(MessageUtils.color(MessageUtils.replace(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_PROMO_NOT_FOUND),
-                    "command", "/" + name)));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_PROMO_NOT_FOUND),
+                    "command", "/" + name);
         }
     }
 }

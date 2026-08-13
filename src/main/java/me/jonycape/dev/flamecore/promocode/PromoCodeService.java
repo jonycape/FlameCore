@@ -4,6 +4,7 @@ import lombok.Getter;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.database.PromoCodeDAO;
+import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import me.jonycape.dev.flamecore.utils.MessageUtils;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.title.Title;
@@ -86,9 +87,8 @@ public final class PromoCodeService {
         String playerKey = player.getName().toLowerCase();
         int current = dao.getUses(code.getCode(), playerKey);
         if (current >= code.getUses()) {
-            player.sendMessage(MessageUtils.color(MessageUtils.replace(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_PROMO_ALREADY_USED),
-                    "code", code.getCode())));
+            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_PROMO_ALREADY_USED),
+                    "code", code.getCode());
             return Result.ALREADY_USED;
         }
         dao.setUses(code.getCode(), playerKey, current + 1);
@@ -98,9 +98,8 @@ public final class PromoCodeService {
                     cmd.replace("%player%", player.getName()));
         }
 
-        player.sendMessage(MessageUtils.color(MessageUtils.replace(
-                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_PROMO_ACTIVATED),
-                "code", code.getCode())));
+        MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_PROMO_ACTIVATED),
+                "code", code.getCode());
         showTitle(player, code.getCode());
         spawnFireworks(player, code);
         return Result.OK;

@@ -1,0 +1,33 @@
+# ============================================
+#  Топ по платежам (flamecore.admin)
+# ============================================
+# /flamecore addpayment <ник>        — +1 к счётчику игрока (шлёт сайт при покупке).
+# /flamecore paymenttop spawn        — спавн NPC-жителя + голограммы на месте игрока.
+# /flamecore paymenttop remove       — убрать NPC + голограмму.
+# /flamecore paymenttop clear        — полный вайп топа платежей.
+# Точка спавна NPC и голограммы сохраняется здесь и переживает рестарт.
+# Топ обновляется каждые update-interval минут. Плейсхолдеры в голограмме:
+#   %flamecore_donatetop_1% ... %flamecore_donatetop_5% — места 1-5 (пустые = N/A).
+donatetop:
+  # Как часто обновлять топ на голограмме (в минутах).
+  update-interval: 5
+  # Имя NPC-жителя.
+  npc-name: "&e&lТОП ПО ПЛАТЕЖАМ"
+  # Точки спавна (записываются автоматически командой spawn).
+  # Можно поднять/опустить голограмму, меняя y в hologram-location (житель не сдвинется).
+  npc-location: null
+  hologram-location: null
+
+# Текст голограммы (строки сверху вниз). Поддерживаются цвета & и &#hex,
+# а также плейсхолдеры мест. Пустые строки — просто пустая строка.
+donatetop-hologram:
+  - ""
+  - "&e&lЭТО ТОП ПО ПЛАТЕЖАМ"
+  - ""
+  - "&61 место: &f%flamecore_donatetop_1%"
+  - "&e2 место: &f%flamecore_donatetop_2%"
+  - "&b3 место: &f%flamecore_donatetop_3%"
+  - "&d4 место: &f%flamecore_donatetop_4%"
+  - "&a5 место: &f%flamecore_donatetop_5%"
+  - ""
+  - "&7Спасибо этим игрокам!"

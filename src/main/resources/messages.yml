@@ -1,0 +1,427 @@
+﻿# ============================================
+#  Игровые сообщения плагина (FlameCore)
+# ============================================
+messages:
+  prefix: "&8[&6FlameCore&8] &r"
+
+  no-permission:
+    - "&r"
+    - "&r  &c⛔ &nНедостаточно прав"
+    - "&r"
+    - "&r  &7➥ &fУ вас &cнедостаточно прав &fдля этого действия."
+    - "&r  &7➥ &fОбратитесь к &6администрации&f, если считаете это ошибкой."
+    - "&r"
+
+  unknown-command:
+    - "&r"
+    - "&r  &e❓ &nНеизвестная команда"
+    - "&r"
+    - "&r  &7➥ &fКоманда не найдена или введена с &eошибкой&f."
+    - "&r  &7➥ &fВоспользуйтесь &6/flamecore &fдля просмотра доступных команд."
+    - "&r"
+
+  panel-locked:
+    - "&r"
+    - "&r  &c🔒 &nДоступ к панели заблокирован"
+    - "&r"
+    - "&r  &7➥ &fУ вас &cнет доступа &fк панели управления."
+    - "&r  &7➥ &fНажмите кнопку &a«Выдать доступ к панели»&f в &bTelegram-боте"
+    - "&r  &7➥ &fчтобы получить доступ ко &6всем командам&f."
+    - "&r"
+
+  # --- Защита администратора ---
+  admin-approved:
+    - "[sound] LEVEL_UP 1.0 2.0"
+    - "&r"
+    - "&r  &#46e58b✅ &nВход подтверждён"
+    - "&r"
+    - "&r  &7➥ &fДобро пожаловать обратно, &6%player%&f!"
+    - "&r  &7➥ &fСервер, которым вы &aуправляете&f, ждал вас."
+    - "&r  &7➥ &aДоступ к панели управления активирован."
+    - "&r"
+
+  admin-denied:
+    - "&r"
+    - "&r  &c❌ &nВход отклонён"
+    - "&r"
+    - "&r  &7➥ &cДоступ запрещён &fадминистратором через &bTelegram&f."
+    - "&r  &7➥ &fПопробуйте войти &eпозже &fили свяжитесь с &6администрацией&f."
+    - "&r"
+
+  kick-not-admin:
+    - "&r"
+    - "&r  &c⛔ &nДоступ запрещён"
+    - "&r"
+    - "&r  &7➥ &cУ вас есть привилегии, &fкоторые выдаются только &6администраторам&f."
+    - "&r  &7➥ &fОбратитесь к &6администрации&f, если это ошибка."
+    - "&r"
+
+  admin-waiting:
+    - "&r"
+    - "&r  &#ffd166⏳ &nОжидание подтверждения"
+    - "&r"
+    - "&r  &7➥ &fЧтобы войти, подтвердите вход через &bTelegram-бота&f."
+    - "&r  &7➥ &fУведомление отправлено в бота &b@flamedex_bot&f."
+    - "&r  &7➥ &fПока вход &eне подтверждён&f, вы &cобездвижены&f."
+    - "&r"
+
+  admin-waiting-title:
+    - "&r  &#ffd166⏳ Ожидание подтверждения"
+
+  admin-waiting-subtitle:
+    - "&r  &eУведомление отправлено в &b@flamedex_bot"
+
+  owner-panel-granted:
+    - "[sound] LEVEL_UP 1.0 2.0"
+    - "&r"
+    - "&r  &#46e58b✦ &nДоступ к панели выдан"
+    - "&r"
+    - "&r  &7➥ &fТеперь вам доступны &aкоманды&f:"
+    - "&r  &7➥ &e/flamecore tps &7• &e/flamecore mspt &7• &e/flamecore system"
+    - "&r  &7➥ &e/flamecore online &7• &e/flamecore worlds &7• &e/flamecore announce"
+    - "&r  &7➥ &e/flamecore player &7• &e/flamecore check"
+    - "&r"
+
+  owner-panel-denied:
+    - "&r"
+    - "&r  &c❌ &nДоступ не выдан"
+    - "&r"
+    - "&r  &7➥ &fКнопка &eне найдена &fили игрок уже &cвышел&f."
+    - "&r"
+
+  # --- Конкурсы ---
+  giveaway-create-usage:
+    - "&r"
+    - "&r  &e🎁 &nИспользование команды"
+    - "&r"
+    - "&r  &7➥ &f/giveaway create &6<приз> &e<время>"
+    - "&r  &7➥ &fПример: &6/giveaway create VIP-статус 15m"
+    - "&r"
+
+  giveaway-join-usage:
+    - "&r"
+    - "&r  &e🎁 &nИспользование команды"
+    - "&r"
+    - "&r  &7➥ &f/giveaway join &6<id>"
+    - "&r"
+
+  giveaway-invalid-time:
+    - "&r"
+    - "&r  &c⏱ &nОшибка времени"
+    - "&r"
+    - "&r  &7➥ &fНеверный &eформат времени&f."
+    - "&r  &7➥ &fПримеры: &e15m &7(минуты), &e1h &7(часы), &e2d &7(дни)."
+    - "&r"
+
+  giveaway-created:
+    - "[sound] NOTE_PLING 1.0 2.0"
+    - "&r"
+    - "&r  &#ff6b6b🎉 &nНовый конкурс!"
+    - "&r"
+    - "&r  &7➥ &6Приз: &f%prize%"
+    - "&r  &7➥ &6ID: &f%id%"
+    - "&r  &7➥ &6Окончание: &f%time%"
+    - "&r  &7➥ &fУчаствуй: &6/giveaway join %id%"
+    - "&r"
+
+  giveaway-not-found:
+    - "&r"
+    - "&r  &c🔍 &nКонкурс не найден"
+    - "&r"
+    - "&r  &7➥ &fКонкурс &e%id% &fне найден."
+    - "&r  &7➥ &fВозможно, он уже &cзавершён&f."
+    - "&r"
+
+  giveaway-already-joined:
+    - "&r"
+    - "&r  &e📋 &nВы уже в конкурсе"
+    - "&r"
+    - "&r  &7➥ &fВы уже участвуете в конкурсе &e%id%&f."
+    - "&r"
+
+  giveaway-join-success:
+    - "[sound] NOTE_PLING 1.0 1.5"
+    - "&r"
+    - "&r  &a✅ &nВы в конкурсе!"
+    - "&r"
+    - "&r  &7➥ &fВы успешно участвуете в конкурсе &e%id%&a!"
+    - "&r  &7➥ &aЖелаем удачи!"
+    - "&r"
+
+  giveaway-console-only:
+    - "&r"
+    - "&r  &c⛔ &nОшибка"
+    - "&r"
+    - "&r  &7➥ &fЭта команда доступна только &aигрокам&f."
+    - "&r"
+
+  giveaway-no-participants:
+    - "&r"
+    - "&r  &#ffd166📢 &nКонкурс завершён"
+    - "&r"
+    - "&r  &7➥ &eКонкурс &6%id% &e(приз: &6%prize%&e) завершён!"
+    - "&r  &7➥ &cВ конкурсе не было участников, &fпобедитель &eне выбран&f."
+    - "&r"
+
+  giveaway-winner:
+    - "[sound] ORB_PICKUP 1.0 1.0"
+    - "&r"
+    - "&r  &#ffd166🏆 &nРезультаты конкурса"
+    - "&r"
+    - "&r  &7➥ &6Приз: &f%prize%"
+    - "&r  &7➥ &6ID: &f%id%"
+    - "&r  &7➥ &6Победитель: &a%winner%"
+    - "&r  &7➥ &aПоздравляем победителя!"
+    - "&r"
+
+  # --- Команды управления сервером ---
+  management-info:
+    - "&r"
+    - "&r  &6🛠 &nFlamePanel"
+    - "&r"
+    - "&r  &7➥ &fДоступные &aкоманды&f:"
+    - "&r  &7➥ &e/flamecore tps &7• &e/flamecore mspt &7• &e/flamecore system"
+    - "&r  &7➥ &e/flamecore online &7• &e/flamecore worlds &7• &e/flamecore announce"
+    - "&r  &7➥ &e/flamecore player &7• &e/flamecore check &7• &e/flamecore reload"
+    - "&r"
+
+  management-usage:
+    - "&r"
+    - "&r  &c❓ &nОшибка"
+    - "&r"
+    - "&r  &7➥ &fНеверные &eаргументы&f."
+    - "&r  &7➥ &fПроверьте справку: &6/flamecore"
+    - "&r"
+
+  management-tps:
+    - "&r"
+    - "&r  &e📊 &nTPS сервера"
+    - "&r"
+    - "&r  &7➥ &fЗа 1 минуту: &a%tps1%"
+    - "&r  &7➥ &fЗа 5 минут: &a%tps5%"
+    - "&r  &7➥ &fЗа 15 минут: &a%tps15%"
+    - "&r"
+
+  management-mspt:
+    - "&r"
+    - "&r  &e⏱ &nMSPT сервера"
+    - "&r"
+    - "&r  &7➥ &fСреднее время тика: &a%mspt% &7мс"
+    - "&r"
+
+  management-system:
+    - "&r"
+    - "&r  &e💻 &nНагрузка на систему"
+    - "&r"
+    - "&r  &7➥ &fОС: &f%os%"
+    - "&r  &7➥ &fЯдер: &f%cores%"
+    - "&r  &7➥ &fНагрузка CPU: &f%cpu%"
+    - "&r  &7➥ &fПамять: &f%mem%"
+    - "&r"
+
+  management-online:
+    - "&r"
+    - "&r  &e👥 &nОнлайн сервера"
+    - "&r"
+    - "&r  &7➥ &fИгроков онлайн: &a%online%"
+    - "&r"
+
+  management-worlds:
+    - "&r"
+    - "&r  &e🌍 &nОнлайн по мирам"
+    - "&r"
+    - "&r  &7➥ &fРаспределение игроков по мирам:"
+    - "&r"
+
+  management-player:
+    - "&r"
+    - "&r  &e👤 &nИнформация об игроке"
+    - "&r"
+    - "&r  &7➥ &fНик: &f%player%"
+    - "&r  &7➥ &fПривилегия: &f%prefix%"
+    - "&r  &7➥ &fIP: &f%ip%"
+    - "&r  &7➥ &fМир: &f%world%"
+    - "&r  &7➥ &fПинг: &f%ping% &7мс"
+    - "&r  &7➥ &fРежим: &f%gamemode%"
+    - "&r"
+
+  management-player-not-found:
+    - "&r"
+    - "&r  &c❌ &nИгрок не найден"
+    - "&r"
+    - "&r  &7➥ &cИгрок &e%player% &cне найден &fили &eне в сети&f."
+    - "&r"
+
+  management-check:
+    - "&r"
+    - "&r  &e🔍 &nПроверка систем плагина"
+    - "&r"
+    - "&r  &7➥ &fВерсия плагина: &f%version%"
+    - "&r  &7➥ &fБаза данных H2: %db%"
+    - "&r  &7➥ &fTelegram бот: %telegram%"
+    - "&r  &7➥ &fОнлайн: &f%online%"
+    - "&r  &7➥ &fВремя работы: &f%uptime%"
+    - "&r"
+
+  management-reload:
+    - "[sound] NOTE_PLING 1.0 1.0"
+    - "&r"
+    - "&r  &a🔄 &nПерезагрузка"
+    - "&r"
+    - "&r  &7➥ &fКонфигурация и подсистемы &aперезагружены&f."
+    - "&r"
+
+  # --- Промокоды ---
+  promo-activated:
+    - "[sound] LEVEL_UP 1.0 2.0"
+    - "&r"
+    - "&r  &a🎫 &nПромокод активирован!"
+    - "&r"
+    - "&r  &7➥ &fПромокод &6%code% &fуспешно &aактивирован&f!"
+    - "&r  &7➥ &fНаграда уже &aвыдана&f, проверьте &eинвентарь&f."
+    - "&r"
+
+  promo-title:
+    - "&r  &a🎫 Промокод активирован!"
+
+  promo-subtitle:
+    - "&r  &e%code% &7— награда выдана!"
+
+  promo-already-used:
+    - "&r"
+    - "&r  &c⛔ &nПромокод использован"
+    - "&r"
+    - "&r  &7➥ &fВы уже &cактивировали &fпромокод &e%code%&f."
+    - "&r  &7➥ &fКаждый игрок может использовать его &eлишь однажды&f."
+    - "&r"
+
+  promo-not-found:
+    - "&r"
+    - "&r  &c🔍 &nПромокод не найден"
+    - "&r"
+    - "&r  &7➥ &fКоманда &e%command% &fне &eсуществует&f."
+    - "&r  &7➥ &fПроверьте &eправильность &fнаписания промокода."
+    - "&r"
+
+  # --- Кастомизация ---
+  customize-menu:
+    - "&r"
+    - "&r  &d🎨 &nКастомизация"
+    - "&r"
+    - "&r  &7➥ &e/flamecore customize color <цвет>"
+    - "&r  &7➥ &e/flamecore customize parrot"
+    - "&r  &7➥ &e/flamecore customize nimb"
+    - "&r  &7➥ &6Цвета:&f red, orange, yellow, green, cyan, blue, purple, pink, white, rainbow, off"
+    - "&r  &7➥ &fСвечение убирается командой &e... color off"
+    - "&r"
+
+  customize-color-set:
+    - "[sound] NOTE_PLING 1.0 2.0"
+    - "&r"
+    - "&r  &a✨ &nСвечение"
+    - "&r"
+    - "&r  &7➥ &fЦвет свечения: &a%color%"
+    - "&r"
+
+  customize-invalid-color:
+    - "&r"
+    - "&r  &c❌ &nОшибка"
+    - "&r"
+    - "&r  &7➥ &fНеизвестный цвет: &e%color%"
+    - "&r  &7➥ &fДоступные цвета: &6red, orange, yellow, green, cyan, blue, purple, pink, white, rainbow, off"
+    - "&r"
+
+  customize-parrot-on:
+    - "[sound] PARROT_AMBIENT 1.0 1.0"
+    - "&r"
+    - "&r  &a🦜 &nПопугай"
+    - "&r"
+    - "&r  &7➥ &fБессмертный попугай появился у вас на &aплече&f!"
+    - "&r"
+
+  customize-parrot-off:
+    - "[sound] PARROT_HURT 1.0 1.0"
+    - "&r"
+    - "&r  &c🦜 &nПопугай"
+    - "&r"
+    - "&r  &7➥ &fПопугай &cулетел&f. Для возврата введите команду снова."
+    - "&r"
+
+  customize-nimb-on:
+    - "[sound] ENTITY_EXPERIENCE_ORB_PICKUP 1.0 1.0"
+    - "&r"
+    - "&r  &a✨ &nНимб"
+    - "&r"
+    - "&r  &7➥ &fБелый нимб частиц парит над вашей &aголовой&f."
+    - "&r"
+
+  customize-nimb-off:
+    - "&r"
+    - "&r  &c❌ &nНимб убран"
+    - "&r"
+    - "&r  &7➥ &fНимб &cубран&f."
+    - "&r"
+
+  # --- Стримеры ---
+  stream-broadcast:
+    - "[sound] NOTE_PLING 1.0 1.0"
+    - "&r"
+    - "&r  &#ff6b6b🔴 &nСтример в эфире!"
+    - "&r"
+    - "&r  &7➥ &fСтример &6%player% &fзапустил стрим на &aсервере&f!"
+    - "&r  &7➥ &eСмотреть: &f%url%"
+    - "&r"
+
+  stream-usage:
+    - "&r"
+    - "&r  &e📺 &nСтримы"
+    - "&r"
+    - "&r  &7➥ &fИспользование: &6/flamecore stream <ссылка>"
+    - "&r  &7➥ &fСсылка должна начинаться с &bhttp:// &7или &bhttps://"
+    - "&r"
+
+  stream-cooldown:
+    - "&r"
+    - "&r  &e⏳ &nПодождите"
+    - "&r"
+    - "&r  &7➥ &fСлишком часто! Подождите ещё &c%time% сек&f."
+    - "&r"
+
+  stream-console-only:
+    - "&r"
+    - "&r  &c⛔ &nОшибка"
+    - "&r"
+    - "&r  &7➥ &fЭта команда доступна только &aигрокам&f."
+    - "&r"
+
+  # --- Топ по платежам ---
+  donatetop-usage:
+    - "&r"
+    - "&r  &e💰 &nТоп по платежам"
+    - "&r"
+    - "&r  &7➥ &e/flamecore paymenttop spawn"
+    - "&r  &7➥ &e/flamecore paymenttop remove"
+    - "&r  &7➥ &e/flamecore paymenttop clear"
+    - "&r  &7➥ &f(добавление: &e/flamecore addpayment <ник>&f)"
+    - "&r"
+
+  donatetop-spawned:
+    - "&r"
+    - "&r  &a✅ &nТоп по платежам создан"
+    - "&r"
+    - "&r  &7➥ &fNPC и голограмма &aсозданы&f на вашем месте."
+    - "&r"
+
+  donatetop-removed:
+    - "&r"
+    - "&r  &e🗑 &nТоп по платежам убран"
+    - "&r"
+    - "&r  &7➥ &fNPC и голограмма &eубраны&f."
+    - "&r"
+
+  donatetop-cleared:
+    - "&r"
+    - "&r  &e🔄 &nТоп по платежам очищен"
+    - "&r"
+    - "&r  &7➥ &fТоп платежей &eполностью очищен&f (вайп)."
+    - "&r"

@@ -6,6 +6,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -16,13 +17,40 @@ public final class ConfigManager {
     private static ConfigManager instance;
 
     private final Main plugin;
-    private File file;
-    private YamlConfiguration config;
+    private final Map<String, File> files = new LinkedHashMap<>();
+    private final Map<String, YamlConfiguration> configs = new LinkedHashMap<>();
+    private YamlConfiguration merged;
     private final Map<String, Object> cache = new HashMap<>();
+
+    private static final Map<String, String> FILE_BY_PREFIX = new HashMap<>();
+
+    static {
+        FILE_BY_PREFIX.put("database", "config.yml");
+        FILE_BY_PREFIX.put("bot", "config.yml");
+        FILE_BY_PREFIX.put("owner", "config.yml");
+
+        FILE_BY_PREFIX.put("admins", "admin-guard.yml");
+        FILE_BY_PREFIX.put("protection", "admin-guard.yml");
+        FILE_BY_PREFIX.put("telegram-messages", "admin-guard.yml");
+
+        FILE_BY_PREFIX.put("messages", "messages.yml");
+
+        FILE_BY_PREFIX.put("customize", "customize.yml");
+
+        FILE_BY_PREFIX.put("stream", "stream.yml");
+
+        FILE_BY_PREFIX.put("promo-codes", "promo-codes.yml");
+
+        FILE_BY_PREFIX.put("donatetop", "donatetop.yml");
+        FILE_BY_PREFIX.put("donatetop-hologram", "donatetop.yml");
+    }
+
+    private static final List<String> CONFIG_FILES = List.of(
+            "config.yml", "admin-guard.yml", "messages.yml",
+            "customize.yml", "stream.yml", "promo-codes.yml", "donatetop.yml");
 
     private ConfigManager(Main plugin) {
         this.plugin = plugin;
-        this.file = new File(plugin.getDataFolder(), "config.yml");
         load();
     }
 
@@ -33,22 +61,71 @@ public final class ConfigManager {
 
     public void load() {
         try {
-            if (!file.exists()) {
-                plugin.getDataFolder().mkdirs();
-                plugin.saveResource("config.yml", false);
+            plugin.getDataFolder().mkdirs();
+            files.clear();
+            configs.clear();
+            for (String name : CONFIG_FILES) {
+                File file = new File(plugin.getDataFolder(), name);
+                if (!file.exists()) {
+                    plugin.saveResource(name, false);
+                }
+                files.put(name, file);
+                configs.put(name, YamlConfiguration.loadConfiguration(file));
             }
-            this.config = YamlConfiguration.loadConfiguration(file);
-            this.cache.clear();
-            for (String key : config.getKeys(true)) {
-                cache.put(key, config.get(key));
-            }
+            rebuildMerged();
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Не удалось загрузить конфигурацию", e);
         }
     }
 
+    private void rebuildMerged() {
+        this.merged = new YamlConfiguration();
+        this.cache.clear();
+        for (YamlConfiguration config : configs.values()) {
+            for (String key : config.getKeys(true)) {
+                Object value = config.get(key);
+                merged.set(key, value);
+                cache.put(key, value);
+            }
+        }
+    }
+
     public void reload() {
         load();
+    }
+
+    public org.bukkit.configuration.file.YamlConfiguration getConfig() {
+        return merged;
+    }
+
+    private String ownerFile(String path) {
+        int dot = path.indexOf('.');
+        String prefix = dot < 0 ? path : path.substring(0, dot);
+        return FILE_BY_PREFIX.get(prefix);
+    }
+
+    public void set(String path, Object value) {
+        String fileName = ownerFile(path);
+        YamlConfiguration target = fileName == null ? null : configs.get(fileName);
+        if (target == null) {
+            merged.set(path, value);
+            cache.put(path, value);
+            return;
+        }
+        target.set(path, value);
+        merged.set(path, value);
+        cache.put(path, value);
+    }
+
+    public void save() {
+        for (Map.Entry<String, YamlConfiguration> entry : configs.entrySet()) {
+            File file = files.get(entry.getKey());
+            try {
+                entry.getValue().save(file);
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.SEVERE, "Не удалось сохранить " + entry.getKey(), e);
+            }
+        }
     }
 
     public String getString(String path) {

@@ -23,7 +23,14 @@
 - **Промокоды** `/название` (команды из конфига + фейерверк, лимит на игрока в H2).
 - **Кастомизация админов** (свечение GLOW, попугай на плече, нимб частиц) — `flamecore.customize`.
 - **Анонс стримов** `/flamecore stream <url>` — `flamecore.stream`, кулдаун.
+- **Топ по платежам** `/flamecore paymenttop` + `/flamecore addpayment` — NPC-житель +
+  голограмма DecentHolograms с топ-5 платежей (H2), переживает рестарт.
 - **getDouble** добавлен в `ConfigManager` (для радиусов нимба).
+- **Конфиг разбит на файлы** — `config.yml` (база/бот/владелец), `admin-guard.yml`,
+  `messages.yml`, `customize.yml`, `stream.yml`, `promo-codes.yml`, `donatetop.yml`
+  (ConfigManager сливает их в один кэш, пути ключей не изменились).
+- **Резолвер звуков** в `MessageProcessor` — старые имена звуков (`LEVEL_UP`, `NOTE_PLING`, …)
+  маппятся на актуальные для Paper 1.20.1 (`ENTITY_PLAYER_LEVELUP`, `BLOCK_NOTE_BLOCK_PLING`, …).
 
 ---
 
@@ -41,17 +48,21 @@ src/main/java/me/jonycape/dev/flamecore/
 │   ├── GiveawayCommand.java
 │   └── GiveawayJoinCommand.java
 ├── config/
-│   ├── ConfigKeys.java               — константы ключей config.yml (в т.ч. TG_*, PROMO, CUSTOMIZE_*, STREAM_*)
-│   └── ConfigManager.java            — загрузка/кэш; getStringList/getMultiLine/getStringMap/getInt/getDouble/getSection
+│   ├── ConfigKeys.java               — константы ключей конфигов (в т.ч. TG_*, PROMO, CUSTOMIZE_*, STREAM_*)
+│   └── ConfigManager.java            — многофайловая загрузка/кэш; getStringList/getMultiLine/getStringMap/getInt/getDouble/getSection
 ├── database/
 │   ├── DatabaseManager.java          — H2 (локальный файл-база)
 │   ├── GiveawayDAO.java
 │   ├── ParticipantDAO.java
-│   └── PromoCodeDAO.java             — таблица promo_uses(code,player,uses): лимит использования промокода НА ИГРОКА
+│   ├── PromoCodeDAO.java             — таблица promo_uses(code,player,uses): лимит использования промокода НА ИГРОКА
+│   └── DonateTopDAO.java             — таблица donate_top(player,payments): счётчик платежей (+1, топ по убыванию)
 ├── giveaway/
 │   ├── Giveaway.java                 — @Getter/@Setter/@Builder
 │   ├── GiveawayManager.java
 │   └── GiveawayScheduler.java
+├── donatetop/
+│   ├── TopEntry.java                 — record (player, payments)
+│   └── DonateTopService.java         — NPC-житель + голограмма DecentHolograms, refresh по таймеру, точки в конфиге
 ├── management/
 │   ├── ServerManagementService.java  — tps/mspt/system/online/worlds/check/player/announce
 │   └── SessionManager.java           — доступ к панели (ConcurrentHashMap)
@@ -67,12 +78,16 @@ src/main/java/me/jonycape/dev/flamecore/
 │   ├── PromoCodeService.java         — загрузка из config, consume() + фейерверк, Result{OK,NOT_FOUND,ALREADY_USED}
 │   └── PromoCodeListener.java        — PlayerCommandPreprocessEvent (MONITOR): catch `/код` если есть в конфиге
 ├── customize/
-│   ├── Customization.java            — состояние на игрока (glowColor/rainbow/parrot/nimb)
-│   └── CustomizeService.java         — glow-команды скорборда, попугай на плечо, нимб частиц; единый тик
+│   ├── Customization.java            — состояние на игрока (glowColor/currentColor/rainbow/parrot/nimb)
+│   └── CustomizeService.java         — glow-команды скорборда, попугай на плечо (shoulder), нимб частиц; единый тик
+├── placeholder/
+│   └── FlameCoreExpansion.java       — PlaceholderAPI-расширение `flamecore` (%flamecore_glowcolor%)
 ├── stream/
 │   └── StreamService.java            — /stream <url>: валидация, кулдаун по UUID, broadcast
 └── utils/
     ├── MessageUtils.java             — HEX-цвета + translateAlternateColorCodes
+    ├── MessageProcessor.java         — теги сообщений: [console]/[sound]/[message] + %player% + pairs;
+    │                                    резолвер звуков (старые→новые имена для Paper 1.20.1)
     ├── TimeUtils.java
     └── IdGenerator.java
 ```
@@ -167,9 +182,9 @@ src/main/java/me/jonycape/dev/flamecore/
 - `cancel`/`reject` идемпотентны: `pending.remove(id)` атомарен, повторное нажатие без влияния.
 - `reload(AdminProtectionService)` пересобирает паттерны без пересоздания сервиса.
 
-### 3.4 Сообщения настраиваемые + HTML-безопасность
+### 3.4 Сообщения настраиваемые + HTML-безопасность + теги
 
-**Где:** `TelegramNotifier`, `config.yml`, `BaseCommand`, `ServerManagementService`.
+**Где:** `TelegramNotifier`, `config.yml`, `BaseCommand`, `MessageProcessor`, `ServerManagementService`.
 
 - Тексты TG берутся из `telegram-messages:` в config через `tgText(key, pairs)` +
   `Main.getCfg().getMultiLine(key)`. Плейсхолдеры: `%player%`, `%ip%`, `%time%`,
@@ -177,7 +192,17 @@ src/main/java/me/jonycape/dev/flamecore/
 - TG отправляется с `ParseMode.HTML`; **весь** пользовательский контент экранируется
   через `esc()` (`&`→`&amp;`, `<`→`&lt;`, `>`→`&gt;`) — никаких «сырых» тегов из ника/команды.
 - Игровые сообщения — из `messages:` списками (единый блочный стиль, `&#RRGGBB` HEX).
-  `BaseCommand.sendMessage` и `GiveawayManager.buildMessage` больше **не** дописывают префикс сами.
+  `BaseCommand.sendMessage` больше **не** дописывает префикс сами.
+- **Теги сообщений (`MessageProcessor`)**: каждая строка сообщения в конфиге может начинаться
+  с тега, который меняет действие:
+  - `[console] <команда>` — консоль выполняет команду (авто-подстановка `%player%` и пар);
+  - `[sound] <ЗВУК> [громкость] [питч]` — играет звук игроку (по имени enum `org.bukkit.Sound`);
+  - `[message] <текст>` — пишет текст игроку;
+  - без тега — обычная строка-сообщение (обратная совместимость).
+  `MessageProcessor.send(target, list, pairs)` — для одного игрока; `broadcast(list, pairs)` —
+  для всех онлайн: `[console]` выполняется ОДИН раз, `[sound]`/`[message]` — каждому игроку.
+  Подключён во все места отправки игровых сообщений (BaseCommand, CustomizeService, GiveawayManager,
+  StreamService, PromoCodeService/Listener, AdminProtectionService, StreamCommandExecutor).
 - `ServerManagementService.raw` читает текст через `getMultiLine` (фикс: раньше `getString`
   возвращал список с квадратными скобками).
 
@@ -219,22 +244,31 @@ src/main/java/me/jonycape/dev/flamecore/
 - `/flamecore customize` → меню; `color <цвет>` / `parrot` / `nimb` (тоглы).
 - Права: `flamecore.customize` (`PERM_CUSTOMIZE`). Sub-команды пропускают проверку владельца/панели
   в `FlameCoreCommand` (проверяются до `isOwner`).
-- **Свечение (GLOW):** цвет рисуется **отдельным собственным скорбордом** `glowBoard`
-  (`Bukkit.getScoreboardManager().getNewScoreboard()`, создаётся в `start()`), а не общим main-скорбордом.
-  Имена команд короткие `flamecore_<color.getChar()>` (напр. `flamecore_c`) — ДО 16 символов (иначе
-  `registerNewTeam` падает и цвет остаётся белым!). `getTeam` всегда зовёт `setColor`; игрок убирается
-  со старых команд (`removeFromColorTeams` → имя начинается с `flamecore_`) перед добавлением в новую —
-  переключение цветов работает. Радужный (`rainbow`) = циклическая смена по `RAINBOW[]`.
-  **Фикс «всегда белый»:** связка `ensureGlow`/`applyRainbow` ставит игроку `player.setScoreboard(glowBoard)`
-  (свой скорборд мы полностью контролируем) → никакой TAB/скорборд-плагин не перебивает команду, клиент
-  всегда видит правильный цвет. При выключении/выходе скорборд возвращается (`restoreScoreboard` → main).
-- **Попугай:** один `Parrot` на игрока (мапа `parrots: UUID→Parrot`), **фиксированный** вариант
-  `PARROT_VARIANT` (RED). **Реальная сущность в мире** (`invulnerable`/`silent`/`AI(off)`/`gravity(0)`),
-  `setShoulderEntityLeft` **НЕ используется**. Каждый тик убирается случайная остаточная плечевая сущность
-  (`clearShoulder`) и попугай телепортируется на смещение левого плеча игрока (`teleportToShoulder`,
-  по направлению взгляда). **Фикс «дюпа при прыжке»:** раньше `setShoulderEntityLeft` клонировал сущность
-  по NBT и клиент при прыжке сбрасывал её — теперь плечо «держится» телепортом настоящего попугая, дубликатов нет.
-  При респавне старый **удаляется** (`parrot.remove()`).
+- **Свечение (GLOW):** цвет рисуется командой скорборда, в которую входит игрок. Имена команд короткие
+  `flamecore_<color.getChar()>` (напр. `flamecore_c`) — ДО 16 символов (иначе `registerNewTeam` падает и цвет
+  остаётся белым!). `getTeam` всегда зовёт `setColor`; игрок убирается со старых команд
+  (`removeFromColorTeams` → имя начинается с `flamecore_`) перед добавлением в новую — переключение цветов
+  работает. Радужный (`rainbow`) = циклическая смена по `RAINBOW[]`.
+  **Фикс «всегда белый при TAB»:** НЕ подменяем скорборд игрока целиком (TAB ставит свой скорборд и перебивал
+  наш `glowBoard`). Вместо этого цветная команда добавляется на **активный скорборд игрока**
+  (`activeBoard` = `player.getScoreboard()`), а в тике проверяется `isOnColorTeam` и переприменяется — команда
+  видна клиенту на том скорборде, что он реально показывает. При выключении/выходе игрок снимается с команд
+  (`removeFromColorTeams`), скорборд не трогаем.
+- **Попугай:** **shoulder-сущность** (`player.setShoulderEntityLeft(parrot)`), а НЕ летающая
+  мира-сущность. При включении спавнится временный `Parrot` (`PARROT_VARIANT` RED, `invulnerable`/`silent`),
+  вешается на левое плечо, а временная сущность сразу удаляется (`parrot.remove()`) — клиент рисует
+  **сидящего** попугая из NBT игрока, без летающей/дублирующейся сущности. В тике `parrotTick` только
+  проверяется `getShoulderEntityLeft()==null` и при «слетании» (урон и т.п.) происходит повторная посадка.
+  Мапа `parrots: UUID→Parrot` удалена (world-сущностей больше не держим). Выключение/выход/stop —
+  `clearShoulder(player)` = `setShoulderEntityLeft(null)`.
+- **PlaceholderAPI (цвет под TAB):** расширение `FlameCoreExpansion` (идентификатор `flamecore`,
+  плейсхолдер `glowcolor` → текущий цвет свечения как legacy-код, `''` если свечения нет).
+  Регистрируется в `Main.initPlaceholders()` через `PlaceholderAPI.registerExpansion` (только если PAPI
+  установлен; `persist()`=true). Чтобы цвет работал вместе с TAB — в `plugins/TAB/groups.yml` в конце
+  `tagprefix` добавить `%flamecore_glowcolor%` (TAB берёт последний цвет префикса как цвет команды).
+  Эффективный цвет хранится в `Customization.currentColor` (выставляется в `setColor` и `applyRainbow`),
+  читается через `CustomizeService.currentColor(player)`. PAPI добавлен в `pom.xml` (scope `provided`),
+  репозиторий `repo.extendedclip.com`. Без TAB цвет работает и без PAPI (команда скорборда на активном скорборде).
 - **Нимб:** белые частицы `Particle.END_ROD` кольцом над головой (радиус/кол-во из конфига,
   `nimb-radius`, `nimb-particles`).
 - **Оптимизация:** единый `runTaskTimer` (task-interval, дефолт 2 тика); если `active` и `parrots` пусты —
@@ -290,11 +324,77 @@ src/main/java/me/jonycape/dev/flamecore/
 > **ПРАВИЛО:** Telegram I/O (и вообще любой сетевой вызов) — только асинхронно/на фоне,
 > никогда не в main-потоке (`runTask` для Bukkit-реакций, `runTaskAsynchronously` для HTTP).
 
+### 3.12 Конфиг разбит на файлы (ConfigManager)
+
+**Где:** `ConfigManager`, ресурсы `src/main/resources/*.yml`.
+
+Вместо одного `config.yml` настройки лежат по подсистемам (в `config.yml` — только самое важное):
+
+| Файл | Разделы |
+|------|---------|
+| `config.yml` | `database`, `bot`, `owner` |
+| `admin-guard.yml` | `admins`, `protection`, `telegram-messages` |
+| `messages.yml` | `messages` (все игровые сообщения) |
+| `customize.yml` | `customize` |
+| `stream.yml` | `stream` |
+| `promo-codes.yml` | `promo-codes` |
+| `donatetop.yml` | `donatetop`, `donatetop-hologram` |
+
+- `ConfigManager.load()` сохраняет каждый ресурс при первом запуске (`saveResource`), грузит все файлы
+  и **сливает** их в один `merged` `YamlConfiguration` + общий кэш (`rebuildMerged`).
+- **Пути ключей не изменились** — весь код читает через `ConfigKeys` как раньше.
+- `FILE_BY_PREFIX` мапит первый сегмент пути → файл: `set(path, value)` пишет в нужный файл,
+  `save()` сохраняет все файлы (так `DonateTopService` сохраняет точки спавна в `donatetop.yml`).
+- `getConfig()` возвращает merged — `getLocation(...)` работает.
+
+### 3.13 Топ по платежам (flamecore.admin)
+
+**Где:** `donatetop/*`, `DonateTopDAO`, роутинг `addpayment`/`paymenttop` в `FlameCoreCommand`,
+`initDonateTop()` в `Main`.
+
+- **Данные (H2):** `donate_top(player VARCHAR PK, payments INT)`. `addPayment(player)` — upsert +1
+  (`MERGE INTO ... WHEN MATCHED UPDATE +1 ... NOT MATCHED INSERT 1`); `clear()` — вайп;
+  `getTop(limit)` — топ по `payments DESC, player ASC`.
+- **NPC:** житель `Villager` на точке `donatetop.npc-location`, `AI=false`, `invulnerable`,
+  `silent`, `collidable=false`, `canPickupItems=false`, `persistent`; **без имени**
+  (имя над головой убрано). Неубиваем: в `Main` слушатель `EntityDamageEvent` отменяет урон по нему
+  (`donateTopService.isNpc(entity)`).
+- **Взгляд на игрока:** `startLookTask()` — тик находит ближайшего игрока в радиусе `LOOK_RANGE` (8)
+  и поворачивает жителя лицом к нему (`teleport` с направлением).
+- **Голограмма (DecentHolograms):** на `donatetop.hologram-location` (независимо от NPC — правка `y`
+  поднимает только голограмму). Текст — `donatetop-hologram` список, плейсхолдеры
+  `%flamecore_donatetop_1%`…`_5%` (места 1–5, пустые = `N/A`). Создаётся программно
+  (`new Hologram(name, loc)`, `setSaveToFile(false)`), ид-строка `flamecore_donatetop`.
+- **Обновление:** `refresh()` каждые `donatetop.update-interval` минут; `HologramLine.setText(...)`
+  обновляет строки на месте. При remove/stop — `hologram.destroy()` (обязательно, иначе старая
+  голограмма остаётся в мире) + `manager.removeHologram(name)`.
+- **Персистентность:** `spawn` пишет `npc-location` и `hologram-location` в `donatetop.yml`;
+  `init()` при загрузке читает их и восстанавливает NPC + голограмму (переживает рестарт).
+- Включён только если установлен DecentHolograms (`plugin.yml: softdepend`), иначе — пропуск.
+
+### 3.14 Резолвер звуков (MessageProcessor)
+
+**Где:** `MessageProcessor.resolveSound`.
+
+В Paper 1.20.1 старые короткие имена звуков (`LEVEL_UP`, `NOTE_PLING`, `ORB_PICKUP`,
+`PARROT_AMBIENT`, …) **удалены** из enum `org.bukkit.Sound` (остались только `ENTITY_*`/`BLOCK_*`).
+`Sound.valueOf("LEVEL_UP")` кидал исключение, и тег `[sound]` молча не играл.
+
+`resolveSound(raw)`:
+1. прямое имя (`Sound.valueOf`);
+2. алиас из `SOUND_ALIASES` (например `LEVEL_UP`→`ENTITY_PLAYER_LEVELUP`,
+   `NOTE_PLING`→`BLOCK_NOTE_BLOCK_PLING`, `PARROT_*`→`ENTITY_PARROT_*`);
+3. пробует префиксы `ENTITY_`, `BLOCK_`, `UI_`, `ITEM_`, `AMBIENT_`.
+
+Поэтому в конфиге работают и старые, и новые имена звуков.
+
 ---
 
 ## 4. Что доделать ЗАВТРА (TODO)
 
-- [ ] **Проверить в бою** 3 кнопки владельца и сжатие клавиатуры после «Впустить».
+- [ ] Проверить в бою **топ по платежам**: спавн NPC/голограммы, живой житель (взгляд на игрока,
+      неубиваемость), обновление топа, переживание рестарта, `paymenttop remove`/`clear`.
+- [ ] Проверить в бою 3 кнопки владельца и сжатие клавиатуры после «Впустить».
 - [ ] Проверить в бою защиту опасных команд: авто-выполнение по таймауту и бан по «Отклонить».
 - [ ] Проверить в бою TTL входа (`protection.login-timeout`) — авто-разморозка по таймауту.
 - [ ] Проверить в бою промокоды (фейерверк, лимит на игрока), косметику (цвета GLOW/попугай/нимб)
@@ -304,11 +404,11 @@ src/main/java/me/jonycape/dev/flamecore/
 
 > Это утро — баги кастомизации и команды (ФИНАЛЬНЫЕ фиксы):
 >
-> - **Попугай-дюп** (прыжок → старый оставался сзади, новый на плече): рисует `setShoulderEntityLeft` —
->   он КЛОНИРУЕТ сущность по NBT, а клиент при прыжке сбрасывает плечо. **Окончательный фикс:**
->   плечевые сущности убраны полностью. `parrotTick` каждый тик чистит остаточное плечо (`clearShoulder`)
->   и телепортирует **настоящего** попугая на смещение плеча (`teleportToShoulder` по взгляду,
->   `gravity=0`/`AI=off`). Дубликатов больше нет — плечо «держится» телепортом реальной сущности.
+> - **Попугай-дюп** (прыжок → старый оставался сзади, новый на плече): раньше рисовал
+>   `setShoulderEntityLeft` — он КЛОНИРУЕТ сущность по NBT, а клиент при прыжке сбрасывает плечо.
+>   **Окончательный фикс:** плечевые сущности убраны полностью. Попугай — реальная сущность-**пассажир**
+>   игрока (`player.addPassenger`): ванильная механика, не отваливается при прыжке/полёте и не создаёт
+>   следа дубликатов (раньше был телепорт к плечу каждый тик — тоже сбрасывался при прыжке/полёте).
 > - **GLOW всегда белый / радужный не работает**: цвет видят ТОЛЬКО если команда на «активном»
 >   скорборде игрока. **Окончательный фикс:** заведён собственный `glowBoard` (`getNewScoreboard()`).
 >   `ensureGlow`/`applyRainbow` ставят `player.setScoreboard(glowBoard)` и добавляют в команду именно его —
@@ -375,4 +475,5 @@ javac -encoding UTF-8 -proc:full -processorpath lombok.jar \
 ```
 
 POM: `io.papermc.paper-api 1.20.1`, Java 17, gson 2.10.1, lombok 1.18.30,
-`com.github.pengrad:java-telegram-bot-api 6.9.0` (OkHttp 4.10.0, okio 3.2.0, kotlin-stdlib 1.8.10).
+`com.github.pengrad:java-telegram-bot-api 6.9.0` (OkHttp 4.10.0, okio 3.2.0, kotlin-stdlib 1.8.10),
+`com.github.decentsoftware-eu:decentholograms 2.10.1` (provided; item-nbt-api исключён — не резолвится с codemc).

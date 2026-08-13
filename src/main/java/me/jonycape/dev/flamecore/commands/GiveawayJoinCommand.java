@@ -3,7 +3,7 @@ package me.jonycape.dev.flamecore.commands;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.giveaway.GiveawayManager;
-import me.jonycape.dev.flamecore.utils.MessageUtils;
+import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 
@@ -19,8 +19,7 @@ public final class GiveawayJoinCommand extends BaseCommand {
             return;
         }
         if (!(sender instanceof org.bukkit.entity.Player)) {
-            sender.sendMessage(MessageUtils.color(
-                    Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_GIVEAWAY_CONSOLE_ONLY)));
+            MessageProcessor.send(sender, Main.getCfg().getStringList(ConfigKeys.MESSAGE_GIVEAWAY_CONSOLE_ONLY));
             return;
         }
         String id = args[1];

@@ -95,4 +95,16 @@ public final class ConfigKeys {
 
     public static final String PERM_CUSTOMIZE = "flamecore.customize";
     public static final String PERM_STREAM = "flamecore.stream";
+    public static final String PERM_ADMIN = "flamecore.admin";
+
+    public static final String DONATE_TOP_HOLOGRAM = "donatetop-hologram";
+    public static final String DONATE_TOP_NPC_LOCATION = "donatetop.npc-location";
+    public static final String DONATE_TOP_HOLOGRAM_LOCATION = "donatetop.hologram-location";
+    public static final String DONATE_TOP_NPC_NAME = "donatetop.npc-name";
+    public static final String DONATE_TOP_UPDATE_MINUTES = "donatetop.update-interval";
+
+    public static final String MESSAGE_DONATETOP_USAGE = "messages.donatetop-usage";
+    public static final String MESSAGE_DONATETOP_SPAWNED = "messages.donatetop-spawned";
+    public static final String MESSAGE_DONATETOP_REMOVED = "messages.donatetop-removed";
+    public static final String MESSAGE_DONATETOP_CLEARED = "messages.donatetop-cleared";
 }

@@ -3,6 +3,7 @@ package me.jonycape.dev.flamecore.protection;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.management.SessionManager;
+import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import me.jonycape.dev.flamecore.utils.MessageUtils;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.title.Title;
@@ -118,8 +119,8 @@ public final class AdminProtectionService {
         pendingLogins.remove(player.getName().toLowerCase());
         hideBar(player);
         unfreezePlayer(player);
-        player.sendMessage(MessageUtils.color(MessageUtils.replace(
-                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_APPROVED), "player", player.getName())));
+        MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_ADMIN_APPROVED),
+                "player", player.getName());
         log("Вход ПОДТВЕРЖДЁН: " + player.getName());
     }
 
@@ -148,8 +149,8 @@ public final class AdminProtectionService {
         pendingLogins.remove(player.getName().toLowerCase());
         hideBar(player);
         unfreezePlayer(player);
-        player.sendMessage(MessageUtils.color(MessageUtils.replace(
-                Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_OWNER_PANEL_GRANTED), "player", player.getName())));
+        MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_OWNER_PANEL_GRANTED),
+                "player", player.getName());
         log("Панель выдана: " + player.getName());
     }
 
@@ -213,7 +214,7 @@ public final class AdminProtectionService {
     }
 
     private void notifyWaiting(Player player) {
-        player.sendMessage(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING)));
+        MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_ADMIN_WAITING));
         LegacyComponentSerializer legacy = LegacyComponentSerializer.legacySection();
         player.showTitle(Title.title(
                 legacy.deserialize(MessageUtils.color(Main.getCfg().getMultiLine(ConfigKeys.MESSAGE_ADMIN_WAITING_TITLE))),

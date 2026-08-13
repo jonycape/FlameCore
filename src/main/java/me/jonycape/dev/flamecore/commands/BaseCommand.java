@@ -2,7 +2,7 @@ package me.jonycape.dev.flamecore.commands;
 
 import lombok.RequiredArgsConstructor;
 import me.jonycape.dev.flamecore.Main;
-import me.jonycape.dev.flamecore.utils.MessageUtils;
+import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -16,7 +16,6 @@ public abstract class BaseCommand implements CommandExecutor {
     public abstract boolean onCommand(CommandSender sender, Command command, String label, String[] args);
 
     protected void sendMessage(CommandSender sender, String key, String... pairs) {
-        String body = MessageUtils.replace(Main.getCfg().getMultiLine(key), pairs);
-        sender.sendMessage(MessageUtils.color(body));
+        MessageProcessor.send(sender, Main.getCfg().getStringList(key), pairs);
     }
 }

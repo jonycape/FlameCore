@@ -6,7 +6,7 @@ import me.jonycape.dev.flamecore.config.ConfigKeys;
 import me.jonycape.dev.flamecore.database.GiveawayDAO;
 import me.jonycape.dev.flamecore.database.ParticipantDAO;
 import me.jonycape.dev.flamecore.utils.IdGenerator;
-import me.jonycape.dev.flamecore.utils.MessageUtils;
+import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import me.jonycape.dev.flamecore.utils.TimeUtils;
 import org.bukkit.Bukkit;
 
@@ -44,11 +44,10 @@ public final class GiveawayManager {
                 .build();
         giveawayDAO.insertGiveaway(giveaway);
 
-        String message = buildMessage(ConfigKeys.MESSAGE_GIVEAWAY_CREATED,
+        MessageProcessor.broadcast(Main.getCfg().getStringList(ConfigKeys.MESSAGE_GIVEAWAY_CREATED),
                 "id", giveaway.getId(),
                 "prize", prize,
                 "time", TimeUtils.format(duration));
-        Bukkit.broadcastMessage(MessageUtils.color(message));
         return giveaway;
     }
 
@@ -67,28 +66,22 @@ public final class GiveawayManager {
     public void finish(Giveaway giveaway) {
         List<String> participants = participantDAO.getParticipants(giveaway.getId());
         if (participants.isEmpty()) {
-            String message = buildMessage(ConfigKeys.MESSAGE_GIVEAWAY_NO_PARTICIPANTS,
+            MessageProcessor.broadcast(Main.getCfg().getStringList(ConfigKeys.MESSAGE_GIVEAWAY_NO_PARTICIPANTS),
                     "id", giveaway.getId(),
                     "prize", giveaway.getPrize());
-            Bukkit.broadcastMessage(MessageUtils.color(message));
         } else {
             String winner = participants
                     .get(ThreadLocalRandom.current().nextInt(participants.size()));
-            String message = buildMessage(ConfigKeys.MESSAGE_GIVEAWAY_WINNER,
+            MessageProcessor.broadcast(Main.getCfg().getStringList(ConfigKeys.MESSAGE_GIVEAWAY_WINNER),
                     "winner", winner,
                     "id", giveaway.getId(),
                     "prize", giveaway.getPrize());
-            Bukkit.broadcastMessage(MessageUtils.color(message));
         }
         giveawayDAO.deleteGiveaway(giveaway.getId());
     }
 
     public List<Giveaway> getActiveGiveaways() {
         return giveawayDAO.loadAll();
-    }
-
-    private String buildMessage(String key, String... pairs) {
-        return MessageUtils.replace(Main.getCfg().getMultiLine(key), pairs);
     }
 
     public enum JoinResult {
