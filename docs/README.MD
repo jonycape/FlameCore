@@ -31,6 +31,11 @@
   (ConfigManager сливает их в один кэш, пути ключей не изменились).
 - **Резолвер звуков** в `MessageProcessor` — старые имена звуков (`LEVEL_UP`, `NOTE_PLING`, …)
   маппятся на актуальные для Paper 1.20.1 (`ENTITY_PLAYER_LEVELUP`, `BLOCK_NOTE_BLOCK_PLING`, …).
+- **Переключатели модулей** (`modules:` в config.yml) — каждая фича включается/выключается отдельно:
+  protection (защита админов/владельца), giveaway, promocode, customize, stream, donatetop.
+- **Оптимизация** — look-task NPC топа (каждые 2 тика, телепорт только при смене взгляда),
+  кэш конфиг-значений тика кастомизации, thread-safe форматтер времени Telegram,
+  immutable SOUND_ALIASES, прунинг кулдаунов стримов.
 
 ---
 
@@ -49,7 +54,7 @@ src/main/java/me/jonycape/dev/flamecore/
 │   └── GiveawayJoinCommand.java
 ├── config/
 │   ├── ConfigKeys.java               — константы ключей конфигов (в т.ч. TG_*, PROMO, CUSTOMIZE_*, STREAM_*)
-│   └── ConfigManager.java            — многофайловая загрузка/кэш; getStringList/getMultiLine/getStringMap/getInt/getDouble/getSection
+│   └── ConfigManager.java            — многофайловая загрузка/кэш; getStringList/getMultiLine/getStringMap/getInt/getDouble/getSection/getBoolean
 ├── database/
 │   ├── DatabaseManager.java          — H2 (локальный файл-база)
 │   ├── GiveawayDAO.java
@@ -374,9 +379,7 @@ src/main/java/me/jonycape/dev/flamecore/
 
 ### 3.14 Резолвер звуков (MessageProcessor)
 
-**Где:** `MessageProcessor.resolveSound`.
-
-В Paper 1.20.1 старые короткие имена звуков (`LEVEL_UP`, `NOTE_PLING`, `ORB_PICKUP`,
+**Где:** `MessageProcessor.resolveSound`.В Paper 1.20.1 старые короткие имена звуков (`LEVEL_UP`, `NOTE_PLING`, `ORB_PICKUP`,
 `PARROT_AMBIENT`, …) **удалены** из enum `org.bukkit.Sound` (остались только `ENTITY_*`/`BLOCK_*`).
 `Sound.valueOf("LEVEL_UP")` кидал исключение, и тег `[sound]` молча не играл.
 
@@ -388,9 +391,104 @@ src/main/java/me/jonycape/dev/flamecore/
 
 Поэтому в конфиге работают и старые, и новые имена звуков.
 
+### 3.15 Переключатели модулей (config.yml → modules)
+
+**Где:** `Main.isModuleEnabled`, `ConfigManager.getBoolean`, `ConfigKeys.MODULE_*`.
+
+В `config.yml` добавлена секция `modules:` — каждый модуль включается/выключается отдельно
+(`true`/`false`):
+
+| Ключ | Что отключает |
+|------|---------------|
+| `modules.protection` | защиту входа админов/владельца через Telegram + защиту опасных команд |
+| `modules.giveaway` | конкурсы `/giveaway` |
+| `modules.promocode` | промокоды |
+| `modules.customize` | кастомизацию (свечение, попугай, нимб) |
+| `modules.stream` | анонсы стримов |
+| `modules.donatetop` | топ по платежам (NPC + голограмма) |
+| `modules.playerinfo` | `/info` в Telegram-боте |
+| `modules.donate` | донат-алерт (`/flamecore donate`) |
+
+> Сбор статистики игроков (первый/последний вход, время онлайн, история IP) в `PlayerStatsService`
+> работает **всегда**, независимо от `modules.playerinfo` — данные пригодятся другим фичам.
+
+- `Main.onEnable()` вызывает `isModuleEnabled(key)` перед каждым `init*` — если модуль выключен,
+  сервис **не создаётся** (остаётся `null`), слушатели не регистрируются.
+- `Main.reloadPlugin()` тоже учитывает модули: при выключенном `protection` не пересоздаёт
+  `AdminProtectionService`/dangerous, при выключенном `giveaway` не пересоздаёт `GiveawayManager`.
+- `logDisabledModules()` пишет в консоль список отключённых модулей при старте.
+- Команды проверяют сервис на `null` и показывают сообщение `messages.module-disabled`
+  (плейсхолдер `%module%`), если модуль выключен:
+  `FlameCoreCommand` (customize/stream), `GiveawayCommandExecutor`, `StreamCommandExecutor`.
+- `ConfigManager.getBoolean(path, def)` добавлен для чтения булевых флагов.
+
+---
+
+### 3.16 Оповещение о покупке (донат-алерт)
+
+**Где:** `DonateService`, подкоманда `donate` в `FlameCoreCommand`.
+
+Команда **только для консоли/сайта** (т.е. для администраторов, у которых есть доступ к
+консоли/сайту; игрок увидит `messages.donate-console-only`):
+```
+/flamecore donate <ник> <что-купил>
+```
+
+- `<что-купил>` объединяется из всех оставшихся аргументов и **колоризится**
+  (`&c&lИНФЕРНО` → красный жирный), плейсхолдеры `%player%`/`%item%`.
+- Шаблон объявления — `messages.donate-broadcast` (в нём же `[sound]` играет всем).
+- Если игрок онлайн — вокруг него спавнятся **3 фейерверка** (burst) + звук на весь сервер.
+- Управляется модулем `modules.donate` (если выключен — команда показывает `module-disabled`).
+
+Пример шаблона:
+```
+НОВАЯ ПОКУПКА
+ТОЛЬКО ЧТО ИГРОК jonycape КУПИЛ:
+<цвет>ИНФЕРНО + 1000 ОГНЕЙ.
+СПАСИБО ЕМУ, ТЕПЕРЬ АДМИН ПОЧИНИТ ХОСТ.
+```
+
+---
+
+### 3.17 Информация об игроке в Telegram (/info)
+
+**Где:** `PlayerInfoService`, `PlayerStatsService`, `PlayerStatsDAO`.
+
+Новые таблицы H2: `player_stats` (ник/UUID/первый вход/последний вход/общее время/IP)
+и `player_ips` (история IP по входам). `PlayerStatsService` (слушатель входа/выхода)
+ведёт статистику и сессии — общее время корректно растёт и за текущий онлайн.
+
+В чат бота — **владельцу и всем админам** из списка `admins` (ник → Telegram ID), которым
+послано `/info` в личку бота (ответ уходит именно отправившему):
+
+```
+/info <ник>
+```
+
+Отправляется меню **«ИНФОРМАЦИЯ ОБ ИГРОКЕ <ник>»** с 3 кнопками:
+
+| Кнопка | Содержимое |
+|--------|-----------|
+| **Основная информация** | ник, UUID, реальный IP, страна/город по IP (geo), первый вход, последний вход, общее время онлайн, статус online/offline |
+| **Игровая информация** | мир, координаты X/Y/Z, режим игры, уровень опыта, здоровье, голод (только если игрок в сети) |
+| **Модерация** | активные муты (LiteBans), история всех IP с датой первого входа |
+
+- **Страна/город** — бесплатный `ip-api.com` (без ключа), кэшируется по IP, запрос асинхронный
+  (НЕ на главном потоке).
+- **Муты** — через API LiteBans **рефлексией** (`litesolutions.litebans.api.Database.isPlayerMuted`)
+  — жёсткой зависимости нет, если LiteBans нет — показывается «—». В `plugin.yml` добавлен
+  `softdepend: LiteBans`.
+- **Клиент/лаунчер** — не выводится (на Paper надёжно не определяется).
+- Тексты сообщений — `playerinfo.yml` (`playerinfo.tg-menu/tg-basic/tg-game/tg-mod`, HTML, плейсхолдеры).
+- Модуль `modules.playerinfo` (нужен включённый `modules.protection` — `/info` идёт через бота);
+  сам `PlayerInfoService` создаётся при включённом `playerinfo` внутри `initProtection()`.
+
 ---
 
 ## 4. Что доделать ЗАВТРА (TODO)
+
+- [ ] Проверить в бою **переключатели модулей** (`config.yml → modules`): выключить каждую фичу отдельно,
+      проверить, что команда показывает `module-disabled` и сервис не грузится.
 
 - [ ] Проверить в бою **топ по платежам**: спавн NPC/голограммы, живой житель (взгляд на игрока,
       неубиваемость), обновление топа, переживание рестарта, `paymenttop remove`/`clear`.
@@ -401,6 +499,8 @@ src/main/java/me/jonycape/dev/flamecore/
       и анонсы стримов (кулдаун).
 - [ ] Вставить реальный токен бота (`bot.token`) + реальный `owner.telegram_id` (полный РЕСТАРТ, НЕ `/flamecore reload` — он не пересоздаёт бота). *(Bot I/O уже асинхронный)*
 - [ ] Проверить в бою **кик не-админов с запрещённым пермишеном** (в т.ч. op) и алерт владельцу.
+- [ ] Проверить в бою **донат-алерт** (`/flamecore donate <ник> <товар>` из консоли): объявление, цветной `%item%`, фейерверки вокруг игрока, звук всем.
+- [ ] Проверить в бою **`/info <ник>`** в боте: 3 кнопки, первый/последний вход, общее время (накапливается), история IP, гео по IP, муты через LiteBans.
 
 > Это утро — баги кастомизации и команды (ФИНАЛЬНЫЕ фиксы):
 >

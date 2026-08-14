@@ -15,15 +15,17 @@ import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
 import org.bukkit.Bukkit;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 
 public final class TelegramNotifier {
 
-    private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+    private static final DateTimeFormatter TIME_FORMAT =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss").withZone(ZoneId.systemDefault());
 
     private final Main plugin;
     private final TelegramBot bot;
@@ -32,6 +34,7 @@ public final class TelegramNotifier {
     private volatile boolean available;
 
     private volatile BiConsumer<String, String> callbackHandler;
+    private volatile BiConsumer<String, String> messageHandler;
 
     public TelegramNotifier(Main plugin) {
         this.plugin = plugin;
@@ -40,13 +43,14 @@ public final class TelegramNotifier {
         this.bot = new TelegramBot(token);
     }
 
-    public void startPolling(BiConsumer<String, String> handler) {
+    public void startPolling(BiConsumer<String, String> callback, BiConsumer<String, String> message) {
         if (!available) {
             return;
         }
-        this.callbackHandler = handler;
+        this.callbackHandler = callback;
+        this.messageHandler = message;
         bot.setUpdatesListener(this::processUpdates, e ->
-                plugin.getLogger().log(Level.WARNING, "Ошибка при приёме обновлений Telegram", e));
+                plugin.getLogger().log(Level.WARNING, "РћС€РёР±РєР° РїСЂРё РїСЂРёС‘РјРµ РѕР±РЅРѕРІР»РµРЅРёР№ Telegram", e));
     }
 
     public void stopPolling() {
@@ -61,10 +65,21 @@ public final class TelegramNotifier {
             for (Update update : updates) {
                 if (update.callbackQuery() != null) {
                     handleCallback(update.callbackQuery());
+                } else if (update.message() != null && update.message().text() != null) {
+                    handleMessage(update.message());
                 }
             }
         }
         return UpdatesListener.CONFIRMED_UPDATES_ALL;
+    }
+
+    private void handleMessage(com.pengrad.telegrambot.model.Message message) {
+        String text = message.text();
+        if (text == null || !text.startsWith("/") || messageHandler == null) {
+            return;
+        }
+        Long userId = message.from() != null ? message.from().id() : null;
+        messageHandler.accept(text, userId == null ? "" : String.valueOf(userId));
     }
 
     private void handleCallback(CallbackQuery query) {
@@ -73,12 +88,12 @@ public final class TelegramNotifier {
             answerCallback(query.id());
             afterCallbackKeyboard(query, data);
             if (callbackHandler != null) {
-                String from = query.from() != null && query.from().username() != null
-                        ? query.from().username() : "";
-                callbackHandler.accept(data, from);
+                String chatId = query.message() != null && query.message().chat() != null
+                        ? String.valueOf(query.message().chat().id()) : "";
+                callbackHandler.accept(data, chatId);
             }
         } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "Ошибка обработки callback Telegram: " + data, e);
+            plugin.getLogger().log(Level.WARNING, "РћС€РёР±РєР° РѕР±СЂР°Р±РѕС‚РєРё callback Telegram: " + data, e);
         }
     }
 
@@ -108,13 +123,13 @@ public final class TelegramNotifier {
         }
         sendMessageTo(telegramId,
                 tgText(ConfigKeys.TG_ADMIN_LOGIN, "player", esc(playerName), "ip", esc(ip),
-                        "time", TIME_FORMAT.format(new Date(timestamp))),
+                        "time", TIME_FORMAT.format(Instant.ofEpochMilli(timestamp))),
                 new InlineKeyboardMarkup(allowButton(playerName), kickButton(playerName)));
     }
 
     public void sendOwnerLogin(String playerName, String ip, long timestamp, boolean panelAsked) {
         sendMessage(tgText(ConfigKeys.TG_OWNER_LOGIN, "player", esc(playerName), "ip", esc(ip),
-                        "time", TIME_FORMAT.format(new Date(timestamp))),
+                        "time", TIME_FORMAT.format(Instant.ofEpochMilli(timestamp))),
                 new InlineKeyboardMarkup(allowButton(playerName), kickButton(playerName), panelButton(playerName)));
     }
 
@@ -125,16 +140,16 @@ public final class TelegramNotifier {
         }
         sendMessageTo(telegramId,
                 tgText(ConfigKeys.TG_DANGER_SENDER, "command", esc(command),
-                        "timeout", String.valueOf(timeoutSeconds), "time", TIME_FORMAT.format(new Date(timestamp))),
+                        "timeout", String.valueOf(timeoutSeconds), "time", TIME_FORMAT.format(Instant.ofEpochMilli(timestamp))),
                 new InlineKeyboardMarkup(
-                        new InlineKeyboardButton("❌ Отменить").callbackData("dc:cancel " + actionId)));
+                        new InlineKeyboardButton("вќЊ РћС‚РјРµРЅРёС‚СЊ").callbackData("dc:cancel " + actionId)));
     }
 
     public void sendDangerAskOwner(String playerName, String command, String actionId, long timestamp) {
         sendMessage(tgText(ConfigKeys.TG_DANGER_OWNER, "player", esc(playerName), "command", esc(command),
-                        "time", TIME_FORMAT.format(new Date(timestamp))),
+                        "time", TIME_FORMAT.format(Instant.ofEpochMilli(timestamp))),
                 new InlineKeyboardMarkup(
-                        new InlineKeyboardButton("⛔ Отклонить и забанить").callbackData("dc:reject " + actionId)));
+                        new InlineKeyboardButton("в›” РћС‚РєР»РѕРЅРёС‚СЊ Рё Р·Р°Р±Р°РЅРёС‚СЊ").callbackData("dc:reject " + actionId)));
     }
 
     public void sendDangerExecuted(String playerName, String command) {
@@ -146,19 +161,27 @@ public final class TelegramNotifier {
             return;
         }
         sendMessage(tgText(ConfigKeys.TG_KICK_NON_ADMIN, "player", esc(playerName), "ip", esc(ip),
-                "time", TIME_FORMAT.format(new Date())), null);
+                "time", TIME_FORMAT.format(Instant.now())), null);
+    }
+
+    public void sendToOwner(String text, InlineKeyboardMarkup markup) {
+        sendMessage(text, markup);
+    }
+
+    public void sendToChat(String chatId, String text, InlineKeyboardMarkup markup) {
+        sendMessageTo(chatId, text, markup);
     }
 
     private static InlineKeyboardButton allowButton(String name) {
-        return new InlineKeyboardButton("✅ Впустить").callbackData("allow " + name);
+        return new InlineKeyboardButton("вњ… Р’РїСѓСЃС‚РёС‚СЊ").callbackData("allow " + name);
     }
 
     private static InlineKeyboardButton kickButton(String name) {
-        return new InlineKeyboardButton("⛔ Кикнуть").callbackData("kick " + name);
+        return new InlineKeyboardButton("в›” РљРёРєРЅСѓС‚СЊ").callbackData("kick " + name);
     }
 
     private static InlineKeyboardButton panelButton(String name) {
-        return new InlineKeyboardButton("🛠 Выдать доступ к панели").callbackData("panel " + name);
+        return new InlineKeyboardButton("рџ›  Р’С‹РґР°С‚СЊ РґРѕСЃС‚СѓРї Рє РїР°РЅРµР»Рё").callbackData("panel " + name);
     }
 
     private static String tgText(String key, String... pairs) {
@@ -190,12 +213,12 @@ public final class TelegramNotifier {
             try {
                 bot.execute(request);
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Не удалось отправить сообщение в Telegram", e);
+                plugin.getLogger().log(Level.WARNING, "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ РІ Telegram", e);
             }
         });
     }
 
-    static String esc(String s) {
+    public static String esc(String s) {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
@@ -204,7 +227,7 @@ public final class TelegramNotifier {
             try {
                 bot.execute(new AnswerCallbackQuery(callbackId));
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "Не удалось ответить на callback", e);
+                plugin.getLogger().log(Level.WARNING, "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РІРµС‚РёС‚СЊ РЅР° callback", e);
             }
         });
     }

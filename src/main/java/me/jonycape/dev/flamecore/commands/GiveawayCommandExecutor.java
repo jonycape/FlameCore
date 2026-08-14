@@ -19,6 +19,10 @@ public final class GiveawayCommandExecutor extends BaseCommand {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (plugin.getGiveawayManager() == null) {
+            sendMessage(sender, ConfigKeys.MESSAGE_MODULE_DISABLED, "module", "конкурсы");
+            return true;
+        }
         if (args.length == 0) {
             sendMessage(sender, ConfigKeys.MESSAGE_GIVEAWAY_CREATE_USAGE);
             return true;

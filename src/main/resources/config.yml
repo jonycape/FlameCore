@@ -13,6 +13,26 @@
 #    promo-codes.yml  — промокоды
 #    donatetop.yml    — топ по платежам (NPC + голограмма)
 
+# --- Модули (каждая фича включается/выключается отдельно) ---
+modules:
+  # Защита входа админов/владельца через Telegram + защита опасных команд
+  protection: true
+  # Конкурсы /giveaway
+  giveaway: true
+  # Промокоды
+  promocode: true
+  # Кастомизация админов (свечение, попугай, нимб)
+  customize: true
+  # Анонсы стримов
+  stream: true
+  # Топ по платежам (NPC + голограмма, нужен DecentHolograms)
+  donatetop: true
+  # Информация об игроке в Telegram (/info). Сбор статистики (первый/последний вход,
+  # время онлайн, история IP) работает всегда, независимо от этого модуля.
+  playerinfo: true
+  # Оповещение о покупке (/flamecore donate, из консоли/сайта)
+  donate: true
+
 # --- База данных ---
 database:
   type: "h2"

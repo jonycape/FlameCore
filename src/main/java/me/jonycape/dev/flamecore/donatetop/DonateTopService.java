@@ -203,8 +203,17 @@ public final class DonateTopService {
             Vector dir = nearest.getEyeLocation().toVector()
                     .subtract(npc.getEyeLocation().toVector()).normalize();
             loc.setDirection(dir);
-            npc.teleport(loc);
-        }, 0L, 1L).getTaskId();
+            if (needsUpdate(loc)) {
+                npc.teleport(loc);
+            }
+        }, 0L, 2L).getTaskId();
+    }
+
+    private boolean needsUpdate(Location target) {
+        Location current = npc.getLocation();
+        float yawDiff = Math.abs(current.getYaw() - target.getYaw());
+        float pitchDiff = Math.abs(current.getPitch() - target.getPitch());
+        return yawDiff > 2.0f || pitchDiff > 2.0f;
     }
 
     private Player findNearestPlayer(Location loc, double range) {

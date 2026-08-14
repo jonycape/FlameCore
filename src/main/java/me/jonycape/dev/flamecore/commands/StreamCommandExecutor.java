@@ -18,6 +18,11 @@ public final class StreamCommandExecutor implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (plugin.getStreamService() == null) {
+            MessageProcessor.send(sender, Main.getCfg().getStringList(ConfigKeys.MESSAGE_MODULE_DISABLED),
+                    "module", "стримеры");
+            return true;
+        }
         if (!(sender instanceof Player player)) {
             MessageProcessor.send(sender, Main.getCfg().getStringList(ConfigKeys.MESSAGE_STREAM_CONSOLE_ONLY));
             return true;

@@ -34,6 +34,7 @@ public final class StreamService {
                 return;
             }
             cooldowns.put(player.getUniqueId(), now);
+            pruneExpired(now, cooldownMs);
         }
         MessageProcessor.broadcast(Main.getCfg().getStringList(ConfigKeys.MESSAGE_STREAM_BROADCAST),
                 "player", player.getName(),
@@ -45,5 +46,12 @@ public final class StreamService {
                 && !url.isBlank()
                 && url.length() <= 200
                 && (url.startsWith("http://") || url.startsWith("https://"));
+    }
+
+    private void pruneExpired(long now, long cooldownMs) {
+        if (cooldowns.size() < 64) {
+            return;
+        }
+        cooldowns.entrySet().removeIf(e -> now - e.getValue() >= cooldownMs);
     }
 }

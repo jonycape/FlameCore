@@ -9,6 +9,15 @@ public final class ConfigKeys {
     public static final String DATABASE_TYPE = "database.type";
     public static final String DATABASE_FILE = "database.file";
 
+    public static final String MODULE_PROTECTION = "modules.protection";
+    public static final String MODULE_GIVEAWAY = "modules.giveaway";
+    public static final String MODULE_PROMOCODE = "modules.promocode";
+    public static final String MODULE_CUSTOMIZE = "modules.customize";
+    public static final String MODULE_STREAM = "modules.stream";
+    public static final String MODULE_DONATETOP = "modules.donatetop";
+    public static final String MODULE_PLAYERINFO = "modules.playerinfo";
+    public static final String MODULE_DONATE = "modules.donate";
+
     public static final String BOT_TOKEN = "bot.token";
 
     public static final String OWNER_NAME = "owner.name";
@@ -26,6 +35,8 @@ public final class ConfigKeys {
     public static final String TG_DANGER_SENDER = "telegram-messages.danger-sender";
     public static final String TG_DANGER_OWNER = "telegram-messages.danger-owner";
     public static final String TG_DANGER_EXECUTED = "telegram-messages.danger-executed";
+
+    public static final String MESSAGE_MODULE_DISABLED = "messages.module-disabled";
 
     public static final String MESSAGE_PREFIX = "messages.prefix";
     public static final String MESSAGE_NO_PERMISSION = "messages.no-permission";
@@ -107,4 +118,13 @@ public final class ConfigKeys {
     public static final String MESSAGE_DONATETOP_SPAWNED = "messages.donatetop-spawned";
     public static final String MESSAGE_DONATETOP_REMOVED = "messages.donatetop-removed";
     public static final String MESSAGE_DONATETOP_CLEARED = "messages.donatetop-cleared";
+
+    public static final String DONATE_BROADCAST = "messages.donate-broadcast";
+    public static final String MESSAGE_DONATE_USAGE = "messages.donate-usage";
+    public static final String MESSAGE_DONATE_CONSOLE_ONLY = "messages.donate-console-only";
+
+    public static final String PLAYERINFO_MENU = "playerinfo.tg-menu";
+    public static final String PLAYERINFO_BASIC = "playerinfo.tg-basic";
+    public static final String PLAYERINFO_GAME = "playerinfo.tg-game";
+    public static final String PLAYERINFO_MOD = "playerinfo.tg-mod";
 }

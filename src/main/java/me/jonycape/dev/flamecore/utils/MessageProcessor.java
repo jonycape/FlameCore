@@ -5,7 +5,6 @@ import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,24 +14,23 @@ public final class MessageProcessor {
     private static final String SOUND = "[sound]";
     private static final String MESSAGE = "[message]";
 
-    private static final Map<String, String> SOUND_ALIASES = new HashMap<>();
+    private static final String[] SOUND_PREFIXES = {"ENTITY_", "BLOCK_", "UI_", "ITEM_", "AMBIENT_"};
 
-    static {
-        SOUND_ALIASES.put("LEVEL_UP", "ENTITY_PLAYER_LEVELUP");
-        SOUND_ALIASES.put("NOTE_PLING", "BLOCK_NOTE_BLOCK_PLING");
-        SOUND_ALIASES.put("ORB_PICKUP", "ENTITY_EXPERIENCE_ORB_PICKUP");
-        SOUND_ALIASES.put("EXPERIENCE_ORB_PICKUP", "ENTITY_EXPERIENCE_ORB_PICKUP");
-        SOUND_ALIASES.put("PARROT_AMBIENT", "ENTITY_PARROT_AMBIENT");
-        SOUND_ALIASES.put("PARROT_HURT", "ENTITY_PARROT_HURT");
-        SOUND_ALIASES.put("PARROT_STEP", "ENTITY_PARROT_STEP");
-        SOUND_ALIASES.put("PARROT_FLY", "ENTITY_PARROT_FLY");
-        SOUND_ALIASES.put("ANVIL", "BLOCK_ANVIL_USE");
-        SOUND_ALIASES.put("CLICK", "UI_BUTTON_CLICK");
-        SOUND_ALIASES.put("FIZZ", "BLOCK_FIRE_EXTINGUISH");
-        SOUND_ALIASES.put("BURP", "ENTITY_PLAYER_BURP");
-        SOUND_ALIASES.put("EAT", "ENTITY_GENERIC_EAT");
-        SOUND_ALIASES.put("BOW_HIT", "ENTITY_ARROW_HIT");
-    }
+    private static final Map<String, String> SOUND_ALIASES = Map.ofEntries(
+            Map.entry("LEVEL_UP", "ENTITY_PLAYER_LEVELUP"),
+            Map.entry("NOTE_PLING", "BLOCK_NOTE_BLOCK_PLING"),
+            Map.entry("ORB_PICKUP", "ENTITY_EXPERIENCE_ORB_PICKUP"),
+            Map.entry("EXPERIENCE_ORB_PICKUP", "ENTITY_EXPERIENCE_ORB_PICKUP"),
+            Map.entry("PARROT_AMBIENT", "ENTITY_PARROT_AMBIENT"),
+            Map.entry("PARROT_HURT", "ENTITY_PARROT_HURT"),
+            Map.entry("PARROT_STEP", "ENTITY_PARROT_STEP"),
+            Map.entry("PARROT_FLY", "ENTITY_PARROT_FLY"),
+            Map.entry("ANVIL", "BLOCK_ANVIL_USE"),
+            Map.entry("CLICK", "UI_BUTTON_CLICK"),
+            Map.entry("FIZZ", "BLOCK_FIRE_EXTINGUISH"),
+            Map.entry("BURP", "ENTITY_PLAYER_BURP"),
+            Map.entry("EAT", "ENTITY_GENERIC_EAT"),
+            Map.entry("BOW_HIT", "ENTITY_ARROW_HIT"));
 
     private MessageProcessor() {
     }
@@ -129,7 +127,7 @@ public final class MessageProcessor {
             } catch (IllegalArgumentException ignored) {
             }
         }
-        for (String prefix : new String[]{"ENTITY_", "BLOCK_", "UI_", "ITEM_", "AMBIENT_"}) {
+        for (String prefix : SOUND_PREFIXES) {
             try {
                 return Sound.valueOf(prefix + name);
             } catch (IllegalArgumentException ignored) {

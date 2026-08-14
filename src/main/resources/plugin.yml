@@ -7,7 +7,7 @@ load: POSTWORLD
 
 authors: [ jonycape ]
 website: www.flamedon.ru
-softdepend: [ PlaceholderAPI, DecentHolograms ]
+softdepend: [ PlaceholderAPI, DecentHolograms, LiteBans ]
 
 commands:
   giveaway:

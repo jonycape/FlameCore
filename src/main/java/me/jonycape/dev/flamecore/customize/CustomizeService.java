@@ -44,6 +44,12 @@ public final class CustomizeService {
     private int nimbCounter;
     private int taskId = -1;
 
+    private int taskTick = 2;
+    private int glowEvery = 1;
+    private int nimbEvery = 1;
+    private int nimbCount = 8;
+    private double nimbRadius = 0.5;
+
     public CustomizeService(Main plugin) {
         this.plugin = plugin;
     }
@@ -72,9 +78,18 @@ public final class CustomizeService {
 
     public void start() {
         loadColors();
-        int tick = ConfigManager.getInstance().getInt("customize.task-interval", 2);
-        tick = Math.max(1, Math.min(tick, 20));
-        taskId = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, tick, tick).getTaskId();
+        taskTick = ConfigManager.getInstance().getInt("customize.task-interval", 2);
+        taskTick = Math.max(1, Math.min(taskTick, 20));
+        glowEvery = everyOf(ConfigKeys.CUSTOMIZE_GLOW_INTERVAL, 10);
+        nimbEvery = everyOf(ConfigKeys.CUSTOMIZE_NIMB_INTERVAL, 5);
+        nimbCount = Math.max(3, Main.getCfg().getInt(ConfigKeys.CUSTOMIZE_NIMB_PARTICLES, 8));
+        nimbRadius = Math.max(0.2, Main.getCfg().getDouble(ConfigKeys.CUSTOMIZE_NIMB_RADIUS, 0.5));
+        taskId = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, taskTick, taskTick).getTaskId();
+    }
+
+    private int everyOf(String key, int defaultDiv) {
+        int interval = Math.max(1, Main.getCfg().getInt(key, defaultDiv));
+        return Math.max(1, (int) Math.round(interval / (double) taskTick));
     }
 
     public void stop() {
@@ -186,12 +201,8 @@ public final class CustomizeService {
         if (active.isEmpty()) {
             return;
         }
-        int taskTick = Math.max(1, ConfigManager.getInstance().getInt("customize.task-interval", 2));
-        taskTick = Math.min(taskTick, 20);
-        boolean rainbowTick = every(ConfigKeys.CUSTOMIZE_GLOW_INTERVAL, 10, taskTick, ++glowCounter);
-        boolean nimbTick = every(ConfigKeys.CUSTOMIZE_NIMB_INTERVAL, 5, taskTick, ++nimbCounter);
-        int nimbCount = Math.max(3, Main.getCfg().getInt(ConfigKeys.CUSTOMIZE_NIMB_PARTICLES, 8));
-        double nimbRadius = Math.max(0.2, Main.getCfg().getDouble(ConfigKeys.CUSTOMIZE_NIMB_RADIUS, 0.5));
+        boolean rainbowTick = every(glowEvery, ++glowCounter);
+        boolean nimbTick = every(nimbEvery, ++nimbCounter);
 
         for (Customization state : active.values()) {
             Player player = Bukkit.getPlayer(state.getPlayerId());
@@ -214,9 +225,7 @@ public final class CustomizeService {
         }
     }
 
-    private boolean every(String key, int defaultDiv, int taskTick, int counter) {
-        int interval = Math.max(1, Main.getCfg().getInt(key, defaultDiv));
-        int every = Math.max(1, (int) Math.round(interval / (double) taskTick));
+    private boolean every(int every, int counter) {
         return counter % every == 0;
     }
 

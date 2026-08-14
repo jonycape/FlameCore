@@ -43,11 +43,13 @@ public final class ConfigManager {
 
         FILE_BY_PREFIX.put("donatetop", "donatetop.yml");
         FILE_BY_PREFIX.put("donatetop-hologram", "donatetop.yml");
+
+        FILE_BY_PREFIX.put("playerinfo", "playerinfo.yml");
     }
 
     private static final List<String> CONFIG_FILES = List.of(
             "config.yml", "admin-guard.yml", "messages.yml",
-            "customize.yml", "stream.yml", "promo-codes.yml", "donatetop.yml");
+            "customize.yml", "stream.yml", "promo-codes.yml", "donatetop.yml", "playerinfo.yml");
 
     private ConfigManager(Main plugin) {
         this.plugin = plugin;
@@ -136,6 +138,17 @@ public final class ConfigManager {
     public String getString(String path, String def) {
         String value = getString(path);
         return value == null ? def : value;
+    }
+
+    public boolean getBoolean(String path, boolean def) {
+        Object value = cache.get(path);
+        if (value == null) {
+            return def;
+        }
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        return Boolean.parseBoolean(String.valueOf(value));
     }
 
     public int getInt(String path, int def) {

@@ -22,7 +22,7 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
 
     private static final List<String> SUBCOMMANDS = List.of(
             "tps", "mspt", "system", "online", "worlds", "announce", "player", "check", "reload",
-            "customize", "stream", "addpayment", "paymenttop");
+            "customize", "stream", "addpayment", "paymenttop", "donate");
 
     private final ServerManagementService management;
 
@@ -45,14 +45,25 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
         if (sub.equals("paymenttop")) {
             return handlePaymentTop(sender, args);
         }
+        if (sub.equals("donate")) {
+            return handleDonate(sender, args);
+        }
         if (!(sender instanceof Player player)) {
             return handleConsole(sender, sub);
         }
 
         if (sub.equals("customize")) {
+            if (plugin.getCustomizeService() == null) {
+                sendMessage(sender, ConfigKeys.MESSAGE_MODULE_DISABLED, "module", "кастомизация");
+                return true;
+            }
             return handleCustomize(player, args);
         }
         if (sub.equals("stream")) {
+            if (plugin.getStreamService() == null) {
+                sendMessage(sender, ConfigKeys.MESSAGE_MODULE_DISABLED, "module", "стримеры");
+                return true;
+            }
             return handleStream(player, args);
         }
 
@@ -165,6 +176,26 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
                 sendMessage(sender, ConfigKeys.MESSAGE_DONATETOP_USAGE);
                 return true;
         }
+    }
+
+    private boolean handleDonate(CommandSender sender, String[] args) {
+        if (plugin.getDonateService() == null) {
+            sendMessage(sender, ConfigKeys.MESSAGE_MODULE_DISABLED, "module", "донат-алерт");
+            return true;
+        }
+        if (!(sender instanceof ConsoleCommandSender)) {
+            sendMessage(sender, ConfigKeys.MESSAGE_DONATE_CONSOLE_ONLY);
+            return true;
+        }
+        if (args.length < 3) {
+            sendMessage(sender, ConfigKeys.MESSAGE_DONATE_USAGE);
+            return true;
+        }
+        String nick = args[1];
+        String item = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length));
+        plugin.getDonateService().announce(nick, item);
+        sender.sendMessage("FlameCore: донат для " + nick + " объявлен на сервере.");
+        return true;
     }
 
     private boolean handleSubcommand(CommandSender sender, String sub, String[] args) {
@@ -289,6 +320,13 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
                 }
             }
         } else if (args.length == 2 && args[0].equalsIgnoreCase("addpayment")) {
+            String prefix = args[1].toLowerCase();
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                if (online.getName().toLowerCase().startsWith(prefix)) {
+                    completions.add(online.getName());
+                }
+            }
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("donate")) {
             String prefix = args[1].toLowerCase();
             for (Player online : Bukkit.getOnlinePlayers()) {
                 if (online.getName().toLowerCase().startsWith(prefix)) {
