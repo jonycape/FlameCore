@@ -8,7 +8,7 @@
 #  Остальное разбито по файлам:
 #    admin-guard.yml  — защита администратора (admins, protection, telegram-messages)
 #    messages.yml     — все игровые сообщения плагина
-#    customize.yml    — кастомизация (свечение, попугай, нимб)
+#    customize.yml    — кастомизация (цветное свечение)
 #    stream.yml       — стримеры
 #    promo-codes.yml  — промокоды
 #    donatetop.yml    — топ по платежам (NPC + голограмма)
@@ -21,7 +21,7 @@ modules:
   giveaway: true
   # Промокоды
   promocode: true
-  # Кастомизация админов (свечение, попугай, нимб)
+  # Кастомизация админов (цветное свечение)
   customize: true
   # Анонсы стримов
   stream: true
@@ -41,6 +41,16 @@ database:
 # --- Telegram бот ---
 bot:
   token: "ВАШ_ТОКЕН_БОТА"
+  # Прокси для бота (нужно в РФ, где api.telegram.org заблокирован).
+  # type: "socks" или "http". Оставь enabled: false, если прокси не нужен.
+  # Для локального прокси от VPN укажи host 127.0.0.1 и его порт.
+  proxy:
+    enabled: true
+    type: "http"
+    host: "127.0.0.1"
+    port: 10809
+    user: ""
+    password: ""
 
 # --- Главный администратор (владелец) ---
 owner:

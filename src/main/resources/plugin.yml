@@ -26,7 +26,7 @@ permissions:
     description: Доступ к админским функциям FlameCore
     default: op
   flamecore.customize:
-    description: Кастомизация персонажа (свечение, попугай, нимб)
+    description: Кастомизация персонажа (цветное свечение)
     default: op
   flamecore.stream:
     description: Анонс стрима на весь сервер

@@ -6,9 +6,6 @@ import me.jonycape.dev.flamecore.config.ConfigManager;
 import me.jonycape.dev.flamecore.utils.MessageProcessor;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Particle;
-import org.bukkit.entity.Parrot;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -32,8 +29,6 @@ public final class CustomizeService {
 
     private static final int GLOW_DURATION = 20 * 60 * 60;
 
-    private static final Parrot.Variant PARROT_VARIANT = Parrot.Variant.RED;
-
     private final Main plugin;
     private final Map<UUID, Customization> active = new HashMap<>();
     private final Map<String, ChatColor> colorNames = new HashMap<>();
@@ -41,14 +36,10 @@ public final class CustomizeService {
 
     private int rainbowIndex;
     private int glowCounter;
-    private int nimbCounter;
     private int taskId = -1;
 
     private int taskTick = 2;
     private int glowEvery = 1;
-    private int nimbEvery = 1;
-    private int nimbCount = 8;
-    private double nimbRadius = 0.5;
 
     public CustomizeService(Main plugin) {
         this.plugin = plugin;
@@ -81,9 +72,6 @@ public final class CustomizeService {
         taskTick = ConfigManager.getInstance().getInt("customize.task-interval", 2);
         taskTick = Math.max(1, Math.min(taskTick, 20));
         glowEvery = everyOf(ConfigKeys.CUSTOMIZE_GLOW_INTERVAL, 10);
-        nimbEvery = everyOf(ConfigKeys.CUSTOMIZE_NIMB_INTERVAL, 5);
-        nimbCount = Math.max(3, Main.getCfg().getInt(ConfigKeys.CUSTOMIZE_NIMB_PARTICLES, 8));
-        nimbRadius = Math.max(0.2, Main.getCfg().getDouble(ConfigKeys.CUSTOMIZE_NIMB_RADIUS, 0.5));
         taskId = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, taskTick, taskTick).getTaskId();
     }
 
@@ -102,9 +90,6 @@ public final class CustomizeService {
             if (player == null) {
                 continue;
             }
-            if (customization.isParrot()) {
-                clearShoulder(player);
-            }
             removeFromAllTeams(player);
             player.removePotionEffect(PotionEffectType.GLOWING);
         }
@@ -113,10 +98,6 @@ public final class CustomizeService {
 
     public void onQuit(Player player) {
         UUID id = player.getUniqueId();
-        Customization state = active.get(id);
-        if (state != null && state.isParrot()) {
-            clearShoulder(player);
-        }
         removeFromAllTeams(player);
         player.removePotionEffect(PotionEffectType.GLOWING);
         active.remove(id);
@@ -163,32 +144,6 @@ public final class CustomizeService {
                 "color", rawNames.getOrDefault(key, "&f" + key));
     }
 
-    public void toggleParrot(Player player) {
-        UUID id = player.getUniqueId();
-        Customization state = active.computeIfAbsent(id, Customization::new);
-        boolean enable = !state.isParrot();
-        state.setParrot(enable);
-        if (enable) {
-            mountShoulderParrot(player);
-            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_PARROT_ON));
-        } else {
-            clearShoulder(player);
-            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_PARROT_OFF));
-        }
-    }
-
-    public void toggleNimb(Player player) {
-        UUID id = player.getUniqueId();
-        Customization state = active.computeIfAbsent(id, Customization::new);
-        boolean enable = !state.isNimb();
-        state.setNimb(enable);
-        if (enable) {
-            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_NIMB_ON));
-        } else {
-            MessageProcessor.send(player, Main.getCfg().getStringList(ConfigKeys.MESSAGE_CUSTOMIZE_NIMB_OFF));
-        }
-    }
-
     public List<String> getColorNames() {
         List<String> names = new ArrayList<>(colorNames.keySet());
         names.add("rainbow");
@@ -202,15 +157,11 @@ public final class CustomizeService {
             return;
         }
         boolean rainbowTick = every(glowEvery, ++glowCounter);
-        boolean nimbTick = every(nimbEvery, ++nimbCounter);
 
         for (Customization state : active.values()) {
             Player player = Bukkit.getPlayer(state.getPlayerId());
             if (player == null || !player.isOnline() || player.getWorld() == null) {
                 continue;
-            }
-            if (state.isNimb() && nimbTick) {
-                spawnNimb(player, nimbCount, nimbRadius);
             }
             if (state.isRainbow()) {
                 if (rainbowTick) {
@@ -227,38 +178,6 @@ public final class CustomizeService {
 
     private boolean every(int every, int counter) {
         return counter % every == 0;
-    }
-
-    private void parrotTick(Player player) {
-        if (player.getShoulderEntityLeft() == null) {
-            mountShoulderParrot(player);
-        }
-    }
-
-    private void mountShoulderParrot(Player player) {
-        Parrot parrot = (Parrot) player.getWorld().spawnEntity(
-                player.getLocation(), org.bukkit.entity.EntityType.PARROT);
-        parrot.setVariant(PARROT_VARIANT);
-        parrot.setInvulnerable(true);
-        parrot.setSilent(true);
-        player.setShoulderEntityLeft(parrot);
-        parrot.remove();
-    }
-
-    private void clearShoulder(Player player) {
-        player.setShoulderEntityLeft(null);
-    }
-
-    private void spawnNimb(Player player, int count, double radius) {
-        Location head = player.getEyeLocation().add(0, 0.35, 0);
-        double start = Math.toRadians(player.getTicksLived() * 1.5);
-        for (int i = 0; i < count; i++) {
-            double angle = start + (2 * Math.PI * i / count);
-            double dx = Math.cos(angle) * radius;
-            double dz = Math.sin(angle) * radius;
-            player.getWorld().spawnParticle(Particle.END_ROD,
-                    head.getX() + dx, head.getY(), head.getZ() + dz, 0, 0, 0, 0, 0);
-        }
     }
 
     private void applyGlow(Player player) {

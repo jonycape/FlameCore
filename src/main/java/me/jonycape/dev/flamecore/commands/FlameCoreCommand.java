@@ -71,7 +71,7 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
             sendMessage(sender, ConfigKeys.MESSAGE_NO_PERMISSION);
             return true;
         }
-        if (!SessionManager.hasAccess(player.getName())) {
+        if (plugin.getAdminProtectionService() != null && !SessionManager.hasAccess(player.getName())) {
             sendMessage(sender, ConfigKeys.MESSAGE_PANEL_LOCKED);
             return true;
         }
@@ -96,12 +96,6 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
                 } else {
                     service.setColor(player, args[2]);
                 }
-                return true;
-            case "parrot":
-                service.toggleParrot(player);
-                return true;
-            case "nimb":
-                service.toggleNimb(player);
                 return true;
             default:
                 service.menu(player);
@@ -297,10 +291,8 @@ public final class FlameCoreCommand extends BaseCommand implements TabCompleter 
             }
         } else if (args.length == 2 && args[0].equalsIgnoreCase("customize")) {
             String prefix = args[1].toLowerCase();
-            for (String opt : List.of("color", "parrot", "nimb")) {
-                if (opt.startsWith(prefix)) {
-                    completions.add(opt);
-                }
+            if ("color".startsWith(prefix)) {
+                completions.add("color");
             }
         } else if (args.length == 3 && args[0].equalsIgnoreCase("customize")
                 && args[1].equalsIgnoreCase("color")) {

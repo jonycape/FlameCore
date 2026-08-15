@@ -20,6 +20,13 @@ public final class ConfigKeys {
 
     public static final String BOT_TOKEN = "bot.token";
 
+    public static final String BOT_PROXY_ENABLED = "bot.proxy.enabled";
+    public static final String BOT_PROXY_TYPE = "bot.proxy.type";
+    public static final String BOT_PROXY_HOST = "bot.proxy.host";
+    public static final String BOT_PROXY_PORT = "bot.proxy.port";
+    public static final String BOT_PROXY_USER = "bot.proxy.user";
+    public static final String BOT_PROXY_PASSWORD = "bot.proxy.password";
+
     public static final String OWNER_NAME = "owner.name";
     public static final String OWNER_TELEGRAM_ID = "owner.telegram_id";
 
@@ -84,19 +91,10 @@ public final class ConfigKeys {
     public static final String MESSAGE_PROMO_TITLE = "messages.promo-title";
     public static final String MESSAGE_PROMO_SUBTITLE = "messages.promo-subtitle";
 
-    public static final String CUSTOMIZE_GLOW_INTERVAL = "customize.glow-interval";
-    public static final String CUSTOMIZE_NIMB_INTERVAL = "customize.nimb-interval";
-    public static final String CUSTOMIZE_NIMB_RADIUS = "customize.nimb-radius";
-    public static final String CUSTOMIZE_NIMB_PARTICLES = "customize.nimb-particles";
-    public static final String CUSTOMIZE_PARROT_INTERVAL = "customize.parrot-interval";
-
-    public static final String MESSAGE_CUSTOMIZE_MENU = "messages.customize-menu";
-    public static final String MESSAGE_CUSTOMIZE_COLOR_SET = "messages.customize-color-set";
-    public static final String MESSAGE_CUSTOMIZE_INVALID_COLOR = "messages.customize-invalid-color";
-    public static final String MESSAGE_CUSTOMIZE_PARROT_ON = "messages.customize-parrot-on";
-    public static final String MESSAGE_CUSTOMIZE_PARROT_OFF = "messages.customize-parrot-off";
-    public static final String MESSAGE_CUSTOMIZE_NIMB_ON = "messages.customize-nimb-on";
-    public static final String MESSAGE_CUSTOMIZE_NIMB_OFF = "messages.customize-nimb-off";
+public static final String CUSTOMIZE_GLOW_INTERVAL = "customize.glow-interval";
+public static final String MESSAGE_CUSTOMIZE_MENU = "messages.customize-menu";
+public static final String MESSAGE_CUSTOMIZE_COLOR_SET = "messages.customize-color-set";
+public static final String MESSAGE_CUSTOMIZE_INVALID_COLOR = "messages.customize-invalid-color";
 
     public static final String STREAM_COOLDOWN = "stream.cooldown";
     public static final String MESSAGE_STREAM_BROADCAST = "messages.stream-broadcast";

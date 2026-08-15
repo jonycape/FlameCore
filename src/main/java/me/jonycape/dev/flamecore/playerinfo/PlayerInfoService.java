@@ -45,6 +45,7 @@ public final class PlayerInfoService {
     }
 
     public void handleCommand(String text, String chatId) {
+        plugin.getLogger().info("[DEBUG] handleCommand: text='" + text + "' chatId='" + chatId + "' admin=" + isAdminOrOwner(chatId));
         if (!isAdminOrOwner(chatId)) {
             return;
         }

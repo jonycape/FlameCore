@@ -3,6 +3,30 @@
 > **Этот файл — память проекта.** Прочитав его завтра, ты сразу вспомнишь, что было сделано,
 > как всё устроено и что осталось доделать. Разделы читай по порядку.
 
+> ## 🚨 ЗАВТРА САМОЕ ГЛАВНОЕ — ПОЧИНИТЬ `/info <ник>` В БОТЕ
+>
+> **Симптом (проверено 15.08):** кнопки входа/панели работают (callback-апдейты приходят
+> и обрабатываются), но `/info jonycape` НЕ отвечает вообще. Отправка в бот идёт, кнопки живые,
+> в конфиге `owner.telegram_id` реальный.
+>
+> **Диагностика:** в `TelegramNotifier.processUpdates` добавлены `[DEBUG]`-логи. При отправке
+> `/info` в консоли НЕ появляется даже `[DEBUG] update: ... msg=true text='/info jonycape'` —
+> значит **message-апдейты не доходят** до `processUpdates`/`handleMessage`, хотя callback-апдейты
+> доходят. (Прокси Happ HTTP `127.0.0.1:10809` — отправка работает, приём сообщений — нет.)
+>
+> **Что делать завтра:**
+> 1. Сначала проверить, действительно ли `getUpdates` возвращает message-апдейты (посмотреть
+>    консольный лог после `/info`; убедиться, что сервер стоит на свежем `target/...shaded.jar`).
+> 2. Разобраться, почему message-апдейты не обрабатываются (тип апдейта, `update.message()`/`text()`,
+>    фильтр `startsWith("/")`, `messageHandler`). Возможная причина — отличия в доставке
+>    `message` vs `callback_query` (например, getUpdates-батч режется прокси, или сообщение приходит
+>    с иным типом/полем).
+> 3. Починить, проверить на сервере, **убрать все `[DEBUG]`-логи** из `TelegramNotifier` и
+>    `PlayerInfoService`.
+>
+> Подробности кода `/info` — раздел 3.17. Связанные файлы: `TelegramNotifier.java`,
+> `PlayerInfoService.java`, `Main.java` (`initProtection`, роутинг `messageHandler`).
+
 ---
 
 ## 1. Что это за проект
@@ -21,7 +45,7 @@
 - **Все сообщения настраиваемые** — в игре (`messages:`) и в Telegram (`telegram-messages:`).
 - **Lombok** для конструкторов/данных.
 - **Промокоды** `/название` (команды из конфига + фейерверк, лимит на игрока в H2).
-- **Кастомизация админов** (свечение GLOW, попугай на плече, нимб частиц) — `flamecore.customize`.
+- **Кастомизация админов** (свечение GLOW; попугай на плече и нимб частиц **удалены**) — `flamecore.customize`.
 - **Анонс стримов** `/flamecore stream <url>` — `flamecore.stream`, кулдаун.
 - **Топ по платежам** `/flamecore paymenttop` + `/flamecore addpayment` — NPC-житель +
   голограмма DecentHolograms с топ-5 платежей (H2), переживает рестарт.
@@ -83,8 +107,8 @@ src/main/java/me/jonycape/dev/flamecore/
 │   ├── PromoCodeService.java         — загрузка из config, consume() + фейерверк, Result{OK,NOT_FOUND,ALREADY_USED}
 │   └── PromoCodeListener.java        — PlayerCommandPreprocessEvent (MONITOR): catch `/код` если есть в конфиге
 ├── customize/
-│   ├── Customization.java            — состояние на игрока (glowColor/currentColor/rainbow/parrot/nimb)
-│   └── CustomizeService.java         — glow-команды скорборда, попугай на плечо (shoulder), нимб частиц; единый тик
+│   ├── Customization.java            — состояние на игрока (glowColor/currentColor/rainbow)
+│   └── CustomizeService.java         — glow-команды скорборда; единый тик (попугай/нимб удалены)
 ├── placeholder/
 │   └── FlameCoreExpansion.java       — PlaceholderAPI-расширение `flamecore` (%flamecore_glowcolor%)
 ├── stream/
@@ -246,7 +270,12 @@ src/main/java/me/jonycape/dev/flamecore/
 
 **Где:** `customize/*`, роутинг в `FlameCoreCommand.handleCustomize`, `PlayerQuitEvent` в `Main`.
 
-- `/flamecore customize` → меню; `color <цвет>` / `parrot` / `nimb` (тоглы).
+> **Сейчас осталось ТОЛЬКО свечение.** Попугай (`parrot`) и нимб (`nimb`) **удалены**
+> (кнопки/случаи в `FlameCoreCommand`, парт-иклы, поля/методы в `Customization`/`CustomizeService`,
+> ключи `CUSTOMIZE_PARROT_*`/`CUSTOMIZE_NIMB_*` в `ConfigKeys`, секции `customize.yml`).
+> Записи ниже — историческая память о том, как это было устроено.
+
+- `/flamecore customize` → меню; `color <цвет>`.
 - Права: `flamecore.customize` (`PERM_CUSTOMIZE`). Sub-команды пропускают проверку владельца/панели
   в `FlameCoreCommand` (проверяются до `isOwner`).
 - **Свечение (GLOW):** цвет рисуется командой скорборда, в которую входит игрок. Имена команд короткие
@@ -403,7 +432,7 @@ src/main/java/me/jonycape/dev/flamecore/
 | `modules.protection` | защиту входа админов/владельца через Telegram + защиту опасных команд |
 | `modules.giveaway` | конкурсы `/giveaway` |
 | `modules.promocode` | промокоды |
-| `modules.customize` | кастомизацию (свечение, попугай, нимб) |
+| `modules.customize` | кастомизацию (свечение) |
 | `modules.stream` | анонсы стримов |
 | `modules.donatetop` | топ по платежам (NPC + голограмма) |
 | `modules.playerinfo` | `/info` в Telegram-боте |
@@ -487,6 +516,12 @@ src/main/java/me/jonycape/dev/flamecore/
 
 ## 4. Что доделать ЗАВТРА (TODO)
 
+> ### 🚨 ПЕРВОЕ И ГЛАВНОЕ — `/info <ник>` в боте не отвечает
+>
+> (Подробно — в блоке в самом верху этого файла.) Кнопки работают, message-апдейты — нет.
+> Починить обработку входящих сообщений в боте, затем **убрать `[DEBUG]`-логи** из
+> `TelegramNotifier` (`processUpdates`/`handleMessage`) и `PlayerInfoService` (`handleCommand`).
+
 - [ ] Проверить в бою **переключатели модулей** (`config.yml → modules`): выключить каждую фичу отдельно,
       проверить, что команда показывает `module-disabled` и сервис не грузится.
 
@@ -495,7 +530,7 @@ src/main/java/me/jonycape/dev/flamecore/
 - [ ] Проверить в бою 3 кнопки владельца и сжатие клавиатуры после «Впустить».
 - [ ] Проверить в бою защиту опасных команд: авто-выполнение по таймауту и бан по «Отклонить».
 - [ ] Проверить в бою TTL входа (`protection.login-timeout`) — авто-разморозка по таймауту.
-- [ ] Проверить в бою промокоды (фейерверк, лимит на игрока), косметику (цвета GLOW/попугай/нимб)
+- [ ] Проверить в бою промокоды (фейерверк, лимит на игрока), косметику (цвета GLOW)
       и анонсы стримов (кулдаун).
 - [ ] Вставить реальный токен бота (`bot.token`) + реальный `owner.telegram_id` (полный РЕСТАРТ, НЕ `/flamecore reload` — он не пересоздаёт бота). *(Bot I/O уже асинхронный)*
 - [ ] Проверить в бою **кик не-админов с запрещённым пермишеном** (в т.ч. op) и алерт владельцу.

@@ -32,18 +32,27 @@ public final class PlayerStatsDAO {
     }
 
     public void recordJoin(String player, String uuid, String ip) {
-        String upsert = "INSERT INTO player_stats (player, uuid, first_join, last_join, total_time, last_ip) "
-                + "VALUES (?, ?, ?, ?, 0, ?) "
-                + "ON CONFLICT (player) DO UPDATE SET "
-                + "uuid = EXCLUDED.uuid, last_join = EXCLUDED.last_join, last_ip = EXCLUDED.last_ip";
         long now = System.currentTimeMillis();
-        try (PreparedStatement ps = conn().prepareStatement(upsert)) {
-            ps.setString(1, player);
-            ps.setString(2, uuid);
-            ps.setLong(3, now);
-            ps.setLong(4, now);
-            ps.setString(5, ip);
-            ps.executeUpdate();
+        try {
+            try (PreparedStatement upd = conn().prepareStatement(
+                    "UPDATE player_stats SET uuid = ?, last_join = ?, last_ip = ? WHERE player = ?")) {
+                upd.setString(1, uuid);
+                upd.setLong(2, now);
+                upd.setString(3, ip);
+                upd.setString(4, player);
+                if (upd.executeUpdate() == 0) {
+                    try (PreparedStatement ins = conn().prepareStatement(
+                            "INSERT INTO player_stats (player, uuid, first_join, last_join, total_time, last_ip) "
+                                    + "VALUES (?, ?, ?, ?, 0, ?)")) {
+                        ins.setString(1, player);
+                        ins.setString(2, uuid);
+                        ins.setLong(3, now);
+                        ins.setLong(4, now);
+                        ins.setString(5, ip);
+                        ins.executeUpdate();
+                    }
+                }
+            }
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Не удалось записать вход для " + player, e);
         }
@@ -51,9 +60,21 @@ public final class PlayerStatsDAO {
     }
 
     private void insertIp(String player, String ip, long time) {
-        String sql = "INSERT INTO player_ips (player, ip, first_seen) VALUES (?, ?, ?) "
-                + "ON CONFLICT (player, ip) DO NOTHING";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (PreparedStatement sel = conn().prepareStatement(
+                "SELECT COUNT(*) FROM player_ips WHERE player = ? AND ip = ?")) {
+            sel.setString(1, player);
+            sel.setString(2, ip);
+            try (ResultSet rs = sel.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    return;
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Не удалось проверить IP для " + player, e);
+            return;
+        }
+        try (PreparedStatement ps = conn().prepareStatement(
+                "INSERT INTO player_ips (player, ip, first_seen) VALUES (?, ?, ?)")) {
             ps.setString(1, player);
             ps.setString(2, ip);
             ps.setLong(3, time);

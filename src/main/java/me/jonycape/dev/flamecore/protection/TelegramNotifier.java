@@ -13,8 +13,17 @@ import com.pengrad.telegrambot.request.SendMessage;
 import lombok.Getter;
 import me.jonycape.dev.flamecore.Main;
 import me.jonycape.dev.flamecore.config.ConfigKeys;
+import okhttp3.Authenticator;
+import okhttp3.Credentials;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.Route;
 import org.bukkit.Bukkit;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -40,7 +49,35 @@ public final class TelegramNotifier {
         this.plugin = plugin;
         String token = Main.getCfg().getString(ConfigKeys.BOT_TOKEN, "");
         this.available = !token.isEmpty() && !token.contains("ВАШ");
-        this.bot = new TelegramBot(token);
+        this.bot = new TelegramBot.Builder(token).okHttpClient(buildHttpClient()).build();
+    }
+
+    private static OkHttpClient buildHttpClient() {
+        if (!Main.getCfg().getBoolean(ConfigKeys.BOT_PROXY_ENABLED, false)) {
+            return new OkHttpClient();
+        }
+        String type = Main.getCfg().getString(ConfigKeys.BOT_PROXY_TYPE, "socks").toLowerCase();
+        String host = Main.getCfg().getString(ConfigKeys.BOT_PROXY_HOST, "127.0.0.1");
+        int port = Main.getCfg().getInt(ConfigKeys.BOT_PROXY_PORT, 1080);
+        String user = Main.getCfg().getString(ConfigKeys.BOT_PROXY_USER, "");
+        String password = Main.getCfg().getString(ConfigKeys.BOT_PROXY_PASSWORD, "");
+
+        Proxy.Type proxyType = "http".equals(type) ? Proxy.Type.HTTP : Proxy.Type.SOCKS;
+        Proxy proxy = new Proxy(proxyType, new InetSocketAddress(host, port));
+
+        OkHttpClient.Builder builder = new OkHttpClient.Builder().proxy(proxy);
+
+        if (!user.isEmpty()) {
+            builder.proxyAuthenticator(new Authenticator() {
+                @Override
+                public Request authenticate(Route route, Response response) throws IOException {
+                    return response.request().newBuilder()
+                            .header("Proxy-Authorization", Credentials.basic(user, password))
+                            .build();
+                }
+            });
+        }
+        return builder.build();
     }
 
     public void startPolling(BiConsumer<String, String> callback, BiConsumer<String, String> message) {
@@ -50,7 +87,7 @@ public final class TelegramNotifier {
         this.callbackHandler = callback;
         this.messageHandler = message;
         bot.setUpdatesListener(this::processUpdates, e ->
-                plugin.getLogger().log(Level.WARNING, "РћС€РёР±РєР° РїСЂРё РїСЂРёС‘РјРµ РѕР±РЅРѕРІР»РµРЅРёР№ Telegram", e));
+                plugin.getLogger().log(Level.WARNING, "Ошибка при приёме обновлений Telegram", e));
     }
 
     public void stopPolling() {
@@ -63,6 +100,9 @@ public final class TelegramNotifier {
     public int processUpdates(List<Update> updates) {
         if (updates != null) {
             for (Update update : updates) {
+                plugin.getLogger().info("[DEBUG] update: cb=" + (update.callbackQuery() != null)
+                        + " msg=" + (update.message() != null)
+                        + " text=" + (update.message() != null ? "'" + update.message().text() + "'" : "null"));
                 if (update.callbackQuery() != null) {
                     handleCallback(update.callbackQuery());
                 } else if (update.message() != null && update.message().text() != null) {
@@ -75,6 +115,7 @@ public final class TelegramNotifier {
 
     private void handleMessage(com.pengrad.telegrambot.model.Message message) {
         String text = message.text();
+        plugin.getLogger().info("[DEBUG] handleMessage enter: text='" + text + "' startsWith/=" + (text != null && text.startsWith("/")) + " handler=" + (messageHandler != null));
         if (text == null || !text.startsWith("/") || messageHandler == null) {
             return;
         }
@@ -93,7 +134,7 @@ public final class TelegramNotifier {
                 callbackHandler.accept(data, chatId);
             }
         } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "РћС€РёР±РєР° РѕР±СЂР°Р±РѕС‚РєРё callback Telegram: " + data, e);
+            plugin.getLogger().log(Level.WARNING, "Ошибка обработки callback Telegram: " + data, e);
         }
     }
 
@@ -142,14 +183,14 @@ public final class TelegramNotifier {
                 tgText(ConfigKeys.TG_DANGER_SENDER, "command", esc(command),
                         "timeout", String.valueOf(timeoutSeconds), "time", TIME_FORMAT.format(Instant.ofEpochMilli(timestamp))),
                 new InlineKeyboardMarkup(
-                        new InlineKeyboardButton("вќЊ РћС‚РјРµРЅРёС‚СЊ").callbackData("dc:cancel " + actionId)));
+                        new InlineKeyboardButton("❌ Отменить").callbackData("dc:cancel " + actionId)));
     }
 
     public void sendDangerAskOwner(String playerName, String command, String actionId, long timestamp) {
         sendMessage(tgText(ConfigKeys.TG_DANGER_OWNER, "player", esc(playerName), "command", esc(command),
                         "time", TIME_FORMAT.format(Instant.ofEpochMilli(timestamp))),
                 new InlineKeyboardMarkup(
-                        new InlineKeyboardButton("в›” РћС‚РєР»РѕРЅРёС‚СЊ Рё Р·Р°Р±Р°РЅРёС‚СЊ").callbackData("dc:reject " + actionId)));
+                        new InlineKeyboardButton("⛔ Отклонить и забанить").callbackData("dc:reject " + actionId)));
     }
 
     public void sendDangerExecuted(String playerName, String command) {
@@ -173,15 +214,15 @@ public final class TelegramNotifier {
     }
 
     private static InlineKeyboardButton allowButton(String name) {
-        return new InlineKeyboardButton("вњ… Р’РїСѓСЃС‚РёС‚СЊ").callbackData("allow " + name);
+        return new InlineKeyboardButton("✅ Впустить").callbackData("allow " + name);
     }
 
     private static InlineKeyboardButton kickButton(String name) {
-        return new InlineKeyboardButton("в›” РљРёРєРЅСѓС‚СЊ").callbackData("kick " + name);
+        return new InlineKeyboardButton("⛔ Кикнуть").callbackData("kick " + name);
     }
 
     private static InlineKeyboardButton panelButton(String name) {
-        return new InlineKeyboardButton("рџ›  Р’С‹РґР°С‚СЊ РґРѕСЃС‚СѓРї Рє РїР°РЅРµР»Рё").callbackData("panel " + name);
+        return new InlineKeyboardButton("🛠 Выдать доступ к панели").callbackData("panel " + name);
     }
 
     private static String tgText(String key, String... pairs) {
@@ -213,7 +254,7 @@ public final class TelegramNotifier {
             try {
                 bot.execute(request);
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёРµ РІ Telegram", e);
+                plugin.getLogger().log(Level.WARNING, "Не удалось отправить сообщение в Telegram", e);
             }
         });
     }
@@ -227,7 +268,7 @@ public final class TelegramNotifier {
             try {
                 bot.execute(new AnswerCallbackQuery(callbackId));
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РІРµС‚РёС‚СЊ РЅР° callback", e);
+                plugin.getLogger().log(Level.WARNING, "Не удалось ответить на callback", e);
             }
         });
     }
